@@ -4,18 +4,20 @@ Reference the Creating an Entity Relationship Diagram final project guide in the
 
 ## List of Pages
 
-[👉🏾👉🏾👉🏾 List the pages you expect to have in your app, with a ⭐ next to pages you have wireframed]
+- Route Gallery (Home Page) ⭐
+- Route Builder
+- Route Details (Shown as custom route example) ⭐
+- Edit Route ⭐
+- Quick Look Modal (on hover) ⭐
 
-## Wireframe 1: [page title]
+## Wireframe 1: Route Gallery (Home Page) + Quick Look Modal (on hover)
 
 [👉🏾👉🏾👉🏾 include wireframe 1]
 
-## Wireframe 2: [page title]
+## Wireframe 2: Route Details (Shown as custom route example)
 
 [👉🏾👉🏾👉🏾 include wireframe 2]
 
-## Wireframe 3: [page title]
+## Wireframe 3: Edit Route
 
 [👉🏾👉🏾👉🏾 include wireframe 3]
-
-[👉🏾👉🏾👉🏾 include more wireframes as desired]
