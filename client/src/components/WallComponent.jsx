@@ -1,5 +1,7 @@
 // Reusable 2D climbing wall: a 12 x 16 grid of T-nut bolt holes.
 // Row 0 is the top of the wall, row 15 is the floor.
+import { findOverlappingHold, getCoveredBolts, getHoldSize, HOLD_SCALE } from '../utils/holdFootprint'
+
 const ROWS = 16
 const COLS = 12
 const ROLES = ['start', 'hand', 'foot', 'finish']
@@ -32,8 +34,20 @@ function WallProfile({ wallType, angle }) {
   )
 }
 
-function WallComponent({ holds = [], editable = false, size = 'md', wallType, angle, onCellClick, onPlacedHoldClick }) {
+// placingSize: size of the hold the builder will bolt on next. Empty bolts where a hold of
+// that size would overlap an existing hold are blocked.
+function WallComponent({
+  holds = [],
+  editable = false,
+  size = 'md',
+  placingSize = 'medium',
+  wallType,
+  angle,
+  onCellClick,
+  onPlacedHoldClick,
+}) {
   const holdsByCell = new Map(holds.map((hold) => [`${hold.row}-${hold.col}`, hold]))
+  const coveredBolts = editable ? getCoveredBolts(holds) : new Map()
   const profileAngle = angle ?? DEFAULT_ANGLES[wallType?.toLowerCase()]
 
   return (
@@ -48,25 +62,60 @@ function WallComponent({ holds = [], editable = false, size = 'md', wallType, an
 
         if (hold) {
           const role = ROLES.includes(hold.role) ? hold.role : 'any'
+          const holdSize = getHoldSize(hold)
+          const scale = { '--hold-scale': `${Math.round(HOLD_SCALE[holdSize] * 100)}%` }
           const image = (
             <img
               className={`wall-hold role-${role}`}
               src={hold.imageUrl}
               alt=""
               draggable={false}
-              style={{ transform: `rotate(${hold.rotation ?? 0}deg)` }}
+              style={{ ...scale, transform: `rotate(${hold.rotation ?? 0}deg)` }}
             />
           )
-          const label = `${hold.role} hold at row ${row}, column ${col}`
+          const label = `${holdSize} ${hold.role} hold at row ${row}, column ${col}`
 
+          // The round hit area matches the hold's visible shape, so clicking anywhere on the
+          // hold selects it (not the transparent corners of the PNG).
           return editable ? (
             <button className="wall-cell" key={key} type="button" aria-label={label} onClick={() => onPlacedHoldClick?.(hold)}>
               {image}
+              <span className="wall-hold-hit" style={scale} />
             </button>
           ) : (
             <div className="wall-cell" key={key} role="img" aria-label={label}>
               {image}
             </div>
+          )
+        }
+
+        const coveringHold = coveredBolts.get(key)
+        if (coveringHold) {
+          // Bolt hidden under a bigger hold: not selectable on its own, clicking selects that hold.
+          return (
+            <button
+              className="wall-cell wall-cell-covered"
+              key={key}
+              type="button"
+              aria-label={`Bolt hole at row ${row}, column ${col}, covered by the ${coveringHold.role} hold at row ${coveringHold.row}, column ${coveringHold.col}`}
+              onClick={() => onPlacedHoldClick?.(coveringHold)}
+            />
+          )
+        }
+
+        const blockingHold = editable && findOverlappingHold(row, col, placingSize, holds)
+        if (blockingHold) {
+          // A hold here would overlap a neighbor, so this bolt can't be used right now.
+          return (
+            <button
+              className="wall-cell wall-cell-blocked"
+              key={key}
+              type="button"
+              disabled
+              aria-label={`Bolt hole at row ${row}, column ${col}, too close to the ${blockingHold.role} hold at row ${blockingHold.row}, column ${blockingHold.col}`}
+            >
+              <span className="wall-bolt" />
+            </button>
           )
         }
 

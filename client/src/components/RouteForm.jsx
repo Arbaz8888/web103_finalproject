@@ -2,20 +2,29 @@ import { useState } from 'react'
 import WallComponent from './WallComponent'
 import HoldLegend from './Hold'
 import { grades } from '../data/starterRoutes'
+import { findOverlappingHold, getHoldSize, SIZES } from '../utils/holdFootprint'
+
+// TODO(#12): replace these with the hold picked in ClimbingHoldsDrawer (its image_url and size).
+// Until then, each size bolts on a jug of that size from public/holds.
+const DEFAULT_HOLD_IMAGES = {
+  small: '/holds/jug-babyblue-small.png',
+  medium: '/holds/jug-orange-medium.png',
+  large: '/holds/jug-green-large.png',
+}
 
 function RouteForm({ existing, onSave }) {
   const [name, setName] = useState(existing?.name ?? '')
   const [grade, setGrade] = useState(existing?.grade ?? 'V0')
   const [wallType, setWallType] = useState(existing?.wallType ?? 'Vertical')
   const [role, setRole] = useState('hand')
+  const [holdSize, setHoldSize] = useState('medium')
   const [holds, setHolds] = useState(existing?.holds ?? [])
   const [error, setError] = useState('')
   const [selectedCell, setSelectedCell] = useState(null)
   const selectedHold = selectedCell && holds.find((hold) => hold.row === selectedCell.row && hold.col === selectedCell.col)
 
-  // TODO(#12): use the hold selected in ClimbingHoldsDrawer instead of this default image.
   function handleCellClick(row, col) {
-    setHolds((current) => [...current, { row, col, role, imageUrl: '/holds/jug-orange-medium.png', rotation: 0 }])
+    setHolds((current) => [...current, { row, col, role, imageUrl: DEFAULT_HOLD_IMAGES[holdSize], size: holdSize, rotation: 0 }])
     setSelectedCell(null)
   }
 
@@ -34,6 +43,16 @@ function RouteForm({ existing, onSave }) {
 
   function rotateHold() {
     updateSelectedHold({ rotation: ((selectedHold.rotation ?? 0) + 45) % 360 })
+  }
+
+  // A placed hold can only change to a size that still fits without overlapping its neighbors.
+  function sizeFits(size) {
+    const others = holds.filter((hold) => hold !== selectedHold)
+    return !findOverlappingHold(selectedHold.row, selectedHold.col, size, others)
+  }
+
+  function resizeHold(size) {
+    updateSelectedHold({ size, imageUrl: DEFAULT_HOLD_IMAGES[size] })
   }
 
   function removeHold() {
@@ -60,6 +79,10 @@ function RouteForm({ existing, onSave }) {
           <legend>Next hold role</legend>
           <div className="role-picker">{['start', 'hand', 'foot', 'finish'].map((item) => <button type="button" className={role === item ? 'selected' : ''} key={item} onClick={() => setRole(item)}>{item}</button>)}</div>
         </fieldset>
+        <fieldset>
+          <legend>Next hold size</legend>
+          <div className="role-picker">{SIZES.map((item) => <button type="button" className={holdSize === item ? 'selected' : ''} key={item} onClick={() => setHoldSize(item)}>{item}</button>)}</div>
+        </fieldset>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
           <button className="button button-reset" onClick={() => { setHolds([]); setSelectedCell(null) }} type="button">Reset Wall</button>
@@ -67,19 +90,37 @@ function RouteForm({ existing, onSave }) {
         </div>
       </div>
       <div>
-        <p className="wall-instruction">Click a bolt to place a <strong>{role}</strong> hold. Click a placed hold to edit it.</p>
+        <p className="wall-instruction">Click a bolt to place a <strong>{holdSize} {role}</strong> hold. Click a placed hold to edit it.</p>
         {selectedHold && (
           <div className="hold-actions">
             <span>
-              <strong>{selectedHold.role}</strong> hold · row {selectedHold.row}, col {selectedHold.col} · {selectedHold.rotation ?? 0}°
+              <strong>{getHoldSize(selectedHold)} {selectedHold.role}</strong> hold · row {selectedHold.row}, col {selectedHold.col} · {selectedHold.rotation ?? 0}°
             </span>
+            <div className="hold-size-buttons" role="group" aria-label="Hold size">
+              {SIZES.map((item) => {
+                const isCurrent = getHoldSize(selectedHold) === item
+                const fits = isCurrent || sizeFits(item)
+                return (
+                  <button
+                    className={`button button-reset${isCurrent ? ' selected' : ''}`}
+                    disabled={!fits}
+                    key={item}
+                    onClick={() => resizeHold(item)}
+                    title={fits ? `Make this a ${item} hold` : `A ${item} hold would overlap a neighboring hold`}
+                    type="button"
+                  >
+                    {item}
+                  </button>
+                )
+              })}
+            </div>
             <button className="button button-reset" onClick={cycleRole} type="button">Cycle role</button>
             <button className="button button-reset" onClick={rotateHold} type="button">Rotate 45°</button>
             <button className="button button-danger" onClick={removeHold} type="button">Remove</button>
             <button className="button button-reset" onClick={() => setSelectedCell(null)} type="button">Done</button>
           </div>
         )}
-        <WallComponent holds={holds} wallType={wallType} editable onCellClick={handleCellClick} onPlacedHoldClick={handlePlacedHoldClick} />
+        <WallComponent holds={holds} wallType={wallType} placingSize={holdSize} editable onCellClick={handleCellClick} onPlacedHoldClick={handlePlacedHoldClick} />
         <HoldLegend />
       </div>
     </form>
