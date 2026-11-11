@@ -54,6 +54,10 @@ legend { color: var(--muted); font-size: .82rem; margin-bottom: 8px; }
 .hold-actions { align-items: center; display: flex; flex-wrap: wrap; font-size: .85rem; gap: 8px; margin-bottom: 12px; }
 .hold-actions span { color: var(--muted); flex-basis: 100%; text-transform: capitalize; }
 .hold-actions .button { font-size: .8rem; padding: 7px 11px; }
+.hold-size-buttons { display: flex; gap: 4px; margin-right: 6px; }
+.hold-size-buttons .button { text-transform: capitalize; }
+.hold-size-buttons .button.selected { background: var(--green); border-color: var(--green); color: white; }
+.hold-size-buttons .button:disabled { cursor: not-allowed; opacity: .4; }
 .wall-instruction { color: var(--muted); font-size: .85rem; }
 /* WallComponent: 12 x 16 T-nut bolt grid */
 .wall { aspect-ratio: 3 / 4; background-color: #c4c0b5; background-image: radial-gradient(rgba(0,0,0,.05) 1px, transparent 1.5px), linear-gradient(110deg, #aaa69b 0%, #d2cec3 50%, #a7a399 100%); background-size: 5px 5px, 100% 100%; border: 8px solid #7d776d; border-radius: 3px; box-shadow: inset 0 0 35px #777268; display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(16, 1fr); padding: 6px; width: 100%; }
@@ -70,13 +74,15 @@ legend { color: var(--muted); font-size: .82rem; margin-bottom: 8px; }
 .wall-profile-wall { stroke: var(--orange); stroke-linecap: round; stroke-width: 4; }
 .wall-cell { align-items: center; background: transparent; border: 0; display: flex; justify-content: center; min-height: 0; min-width: 0; padding: 0; position: relative; }
 .wall-editable .wall-cell { cursor: pointer; }
+.wall-editable .wall-cell-blocked { cursor: not-allowed; }
+.wall-editable .wall-cell-blocked .wall-bolt { opacity: .2; }
 .wall-bolt { background: radial-gradient(circle, #3d3a34 35%, #8a857a 75%); border-radius: 50%; height: 16%; opacity: .45; transition: opacity .15s, transform .15s, box-shadow .15s; width: 16%; }
 .wall-editable .wall-bolt { height: 20%; opacity: .6; width: 20%; }
 .wall-editable .wall-cell:hover .wall-bolt, .wall-editable .wall-cell:focus-visible .wall-bolt { box-shadow: 0 0 0 3px var(--orange); opacity: 1; transform: scale(1.4); }
 .wall-cell:focus-visible { outline: none; }
-.wall-hold { height: 160%; max-width: none; object-fit: contain; pointer-events: none; position: absolute; transition: filter .15s, transform .15s; user-select: none; width: 160%; z-index: 1; }
-.wall-sm .wall-hold { height: 170%; width: 170%; }
-.wall-editable .wall-cell:hover .wall-hold { z-index: 2; }
+.wall-hold { height: var(--hold-scale); max-width: none; object-fit: contain; pointer-events: none; position: absolute; transition: filter .15s, transform .15s; user-select: none; width: var(--hold-scale); z-index: 1; }
+.wall-hold-hit { border-radius: 50%; height: calc(var(--hold-scale) * .8); position: absolute; width: calc(var(--hold-scale) * .8); z-index: 1; }
+.wall-editable .wall-cell:hover .wall-hold, .wall-editable .wall-cell:hover .wall-hold-hit { z-index: 2; }
 .wall-editable .wall-cell:hover .role-any, .wall-editable .wall-cell:focus-visible .role-any { filter: drop-shadow(0 0 3px var(--orange)); }
 .role-any { filter: drop-shadow(1px 2px 2px rgba(40,36,30,.55)); }
 .role-start { filter: drop-shadow(0 0 2px #eab308) drop-shadow(0 0 4px #eab308); }
