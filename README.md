@@ -26,9 +26,11 @@ Pick holds on a blank wall to build your own route. Click a hold to add it, and 
 
 Every hold on a route gets a job: start, hand, foot, or finish. Each one shows up in a different color, so you can tell at a glance how the route works.
 
-### Route Gallery
+### Route Gallery ✅
 
 See every saved route as a card with its name, grade, and a small picture of the wall.
+
+<img src='https://i.imgur.com/AlgBQb7.gif' title='Gallery Page' alt='Gallery Page' />
 
 ### Route Page
 

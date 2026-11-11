@@ -40,4 +40,4 @@ List each issue you completed this unit and the main file or folder where that w
 
 List each feature you completed and checked off in readme.md this unit, one per line:
 
-- No complete features are done as we separated it into backend and frontend sprints.
+- Route Gallery Page
