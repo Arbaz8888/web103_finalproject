@@ -18,23 +18,29 @@ Isaiah boulders a lot, and at the gym people use training boards like the Tensio
 
 ## Features
 
-### Route Builder
+### Route Builder ✅
 
 Pick holds on a blank wall to build your own route. Click a hold to add it, and click it again to take it off.
 
-### Start, Hand, Foot, and Finish Holds
+<img src='https://i.imgur.com/T7IXGT3.gif' title='Filter, quick look, and routes' alt='Filter, quick look, and routes' />
+
+### Start, Hand, Foot, and Finish Holds ✅
 
 Every hold on a route gets a job: start, hand, foot, or finish. Each one shows up in a different color, so you can tell at a glance how the route works.
+
+<img src='https://i.imgur.com/T7IXGT3.gif' title='Filter, quick look, and routes' alt='Filter, quick look, and routes' />
 
 ### Route Gallery ✅
 
 See every saved route as a card with its name, grade, and a small picture of the wall.
 
-<img src='https://i.imgur.com/AlgBQb7.gif' title='Gallery Page' alt='Gallery Page' />
+<img src='https://i.imgur.com/T7IXGT3.gif' title='Filter, quick look, and routes' alt='Filter, quick look, and routes' />
 
-### Route Page
+### Route Page ✅
 
 Every route has its own page and its own link (like /routes/12), so you can open it straight from the gallery or text it to a friend.
+
+<img src='https://i.imgur.com/AlgBQb7.gif' title='Gallery Page' alt='Gallery Page' />
 
 ### Edit a Route
 
@@ -44,13 +50,17 @@ Change a route's name, grade, or holds and save it again.
 
 Get rid of a route you don't want anymore. The app asks "Are you sure?" first so you don't delete something by accident.
 
-### Filter and Sort by Grade
+### Filter and Sort by Grade ✅
 
 Show only routes at a certain grade (like V3), or line them up from easiest to hardest.
 
-### Quick Look
+<img src='https://i.imgur.com/T7IXGT3.gif' title='Filter, quick look, and routes' alt='Filter, quick look, and routes' />
+
+### Quick Look ✅
 
 Click a route card and it pops open in a window on top of the gallery, so you can check it out without leaving the page.
+
+<img src='https://i.imgur.com/T7IXGT3.gif' title='Filter, quick look, and routes' alt='Filter, quick look, and routes' />
 
 ### Save Check
 
