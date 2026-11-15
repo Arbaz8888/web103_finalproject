@@ -11,7 +11,7 @@ function EditRoutePage({ routes, onSave }) {
     <section>
       <Link className="back-link" to={`/routes/${route.id}`}>← Cancel</Link>
       <div className="builder-heading"><p className="eyebrow">EDIT ROUTE</p><h1>Tune your route.</h1></div>
-      <RouteForm existing={route} onSave={(updatedRoute) => { onSave(updatedRoute); navigate(`/routes/${route.id}`) }} />
+      <RouteForm existing={route} onSave={async (updatedRoute) => { await onSave(updatedRoute); navigate(`/routes/${route.id}`) }} />
     </section>
   )
 }

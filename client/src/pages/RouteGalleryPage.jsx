@@ -3,16 +3,27 @@ import { Link } from 'react-router-dom'
 import GradeFilter from '../components/GradeFilter'
 import QuickLookModal from '../components/QuickLookModal'
 import RouteGallery from '../components/RouteGallery'
-import { grades } from '../data/starterRoutes'
+import { grades } from '../data/grades'
 
-function RouteGalleryPage({ routes }) {
+function RouteGalleryPage({ routes, onReset }) {
   const [grade, setGrade] = useState('All grades')
   const [sort, setSort] = useState('easiest')
   const [previewRoute, setPreviewRoute] = useState(null)
+  const [error, setError] = useState('')
   const visibleRoutes = useMemo(() => {
     const filtered = grade === 'All grades' ? [...routes] : routes.filter((route) => route.grade === grade)
     return filtered.sort((a, b) => (sort === 'easiest' ? 1 : -1) * (grades.indexOf(a.grade) - grades.indexOf(b.grade)))
   }, [grade, routes, sort])
+
+  async function handleReset() {
+    if (!window.confirm('Reset the wall? This deletes all routes and brings back the starter routes.')) return
+    try {
+      await onReset()
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
 
   return (
     <>
@@ -22,8 +33,12 @@ function RouteGalleryPage({ routes }) {
           <h1>Find your next problem.</h1>
           <p className="lede">Browse routes built by your crew and find a challenge at your level.</p>
         </div>
-        <Link className="button button-primary" to="/routes/new">＋ New route</Link>
+        <div className="heading-actions">
+          <button className="button button-reset" onClick={handleReset} type="button">⟳ Reset wall</button>
+          <Link className="button button-primary" to="/routes/new">＋ New route</Link>
+        </div>
       </section>
+      {error && <p className="form-error" role="alert">{error}</p>}
       <GradeFilter grade={grade} sort={sort} onGradeChange={setGrade} onSortChange={setSort} />
       <p className="route-count">{visibleRoutes.length} routes</p>
       <RouteGallery routes={visibleRoutes} onQuickLook={setPreviewRoute} />

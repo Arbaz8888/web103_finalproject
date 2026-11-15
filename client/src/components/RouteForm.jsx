@@ -1,21 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import WallComponent from './WallComponent'
 import HoldLegend from './Hold'
-import { grades } from '../data/starterRoutes'
+import { getWallTypes } from '../api/wallTypes'
+import { grades } from '../data/grades'
 import ClimbingHoldsDrawer from './ClimbingHoldsDrawer'
 import { findOverlappingHold, getHoldSize, SIZES } from '../utils/holdFootprint'
 
 function RouteForm({ existing, onSave }) {
   const [name, setName] = useState(existing?.name ?? '')
   const [grade, setGrade] = useState(existing?.grade ?? 'V0')
-  const [wallType, setWallType] = useState(existing?.wallType ?? 'Vertical')
+  const [wallTypeId, setWallTypeId] = useState(existing?.wallTypeId ?? null)
+  const [angle, setAngle] = useState(existing?.angle ?? 0)
+  const [wallTypes, setWallTypes] = useState([])
   const [role, setRole] = useState('hand')
   const [rotation, setRotation] = useState(0)
   const [catalogHold, setCatalogHold] = useState(null)
   const [holds, setHolds] = useState(existing?.holds ?? [])
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [selectedCell, setSelectedCell] = useState(null)
   const selectedHold = selectedCell && holds.find((hold) => hold.row === selectedCell.row && hold.col === selectedCell.col)
+  const wallType = wallTypes.find((type) => type.id === wallTypeId)
+
+  // Load the wall type choices from the API
+  useEffect(() => {
+    getWallTypes()
+      .then((types) => {
+        setWallTypes(types)
+        setWallTypeId((current) => current ?? types.find((type) => type.name === 'Vertical')?.id ?? types[0]?.id)
+      })
+      .catch((err) => setError(err.message))
+  }, [])
+
+  function handleWallTypeChange(id) {
+    const type = wallTypes.find((item) => item.id === id)
+    setWallTypeId(id)
+    if (type) setAngle(type.min_angle)
+  }
 
   function handleCellClick(row, col) {
     if (!catalogHold) {
@@ -62,13 +83,22 @@ function RouteForm({ existing, onSave }) {
     setSelectedCell(null)
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
     if (!name.trim() || !holds.some((hold) => hold.role === 'start') || !holds.some((hold) => hold.role === 'finish')) {
       setError('Add a route name, at least one start hold, and a finish hold before saving.')
       return
     }
-    onSave({ id: existing?.id, name: name.trim(), grade, wallType, holds })
+
+    setError('')
+    setSaving(true)
+    try {
+      await onSave({ id: existing?.id, name: name.trim(), grade, wallTypeId, angle, holds })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -76,7 +106,8 @@ function RouteForm({ existing, onSave }) {
       <div className="form-panel">
         <label>Route name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Moonwalk" /></label>
         <label>Grade<select value={grade} onChange={(event) => setGrade(event.target.value)}>{grades.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label>Wall type<select value={wallType} onChange={(event) => setWallType(event.target.value)}><option>Vertical</option><option>Slab</option><option>Overhang</option><option>Roof</option></select></label>
+        <label>Wall type<select value={wallTypeId ?? ''} onChange={(event) => handleWallTypeChange(Number(event.target.value))}>{wallTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></label>
+        <label>Wall angle (°)<input type="number" value={angle} min={wallType?.min_angle} max={wallType?.max_angle} onChange={(event) => setAngle(Number(event.target.value))} /></label>
         <ClimbingHoldsDrawer
           selectedHold={catalogHold}
           onSelectHold={(hold) => { setCatalogHold(hold); setError('') }}
@@ -88,7 +119,7 @@ function RouteForm({ existing, onSave }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
           <button className="button button-reset" onClick={() => { setHolds([]); setSelectedCell(null) }} type="button">Reset Wall</button>
-          <button className="button button-primary" type="submit">Save route</button>
+          <button className="button button-primary" disabled={saving} type="submit">{saving ? 'Saving…' : 'Save route'}</button>
         </div>
       </div>
       <div>
@@ -126,7 +157,7 @@ function RouteForm({ existing, onSave }) {
             <button className="button button-reset" onClick={() => setSelectedCell(null)} type="button">Done</button>
           </div>
         )}
-        <WallComponent holds={holds} wallType={wallType} placingSize={catalogHold?.size ?? 'medium'} editable onCellClick={handleCellClick} onPlacedHoldClick={handlePlacedHoldClick} />
+        <WallComponent holds={holds} wallType={wallType?.name} angle={angle} placingSize={catalogHold?.size ?? 'medium'} editable onCellClick={handleCellClick} onPlacedHoldClick={handlePlacedHoldClick} />
         <HoldLegend />
       </div>
     </form>

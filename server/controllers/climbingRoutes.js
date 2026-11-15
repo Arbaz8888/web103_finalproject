@@ -17,6 +17,7 @@ const SELECT_ROUTES = `
 					'routeHoldId', rh.id,
 					'holdId', rh.hold_id,
 					'imageUrl', ch.image_url,
+					'size', ch.size,
 					'gridRow', rh.grid_row,
 					'gridCol', rh.grid_col,
 					'role', rh.role,

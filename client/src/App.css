@@ -40,6 +40,7 @@ select, input { background: var(--paper); border: 1px solid var(--line); border-
 .details-layout, .builder-layout { display: grid; gap: 72px; grid-template-columns: 1fr 1fr; }
 .details-meta { align-items: center; color: var(--muted); display: flex; gap: 14px; }
 .details-actions { display: flex; gap: 12px; margin: 34px 0 28px; }
+.heading-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 code { font-family: 'DM Mono', monospace; font-size: .75rem; overflow-wrap: anywhere; }
 .builder-heading { margin-bottom: 36px; }
 .form-panel { display: flex; flex-direction: column; gap: 22px; }
