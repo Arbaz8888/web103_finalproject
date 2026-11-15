@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Navbar from './components/Navbar'
-import * as api from './api'
+import * as api from './api/routes'
 import EditRoutePage from './pages/EditRoutePage'
 import RouteBuilderPage from './pages/RouteBuilderPage'
 import RouteDetailsPage from './pages/RouteDetailsPage'

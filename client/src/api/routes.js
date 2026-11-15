@@ -1,7 +1,7 @@
-// Talks to the Express API. In dev, Vite proxies /api to the server (see vite.config.js).
+// Frontend API layer for climbing routes. In dev, Vite proxies /api to the server (see vite.config.js).
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
-async function request(path, options = {}) {
+export async function request(path, options = {}) {
   const response = await fetch(`${API_URL}/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
@@ -11,7 +11,7 @@ async function request(path, options = {}) {
   return data
 }
 
-const capitalize = (word) => word.charAt(0).toUpperCase() + word.slice(1)
+export const capitalize = (word) => word.charAt(0).toUpperCase() + word.slice(1)
 
 // API route -> the shape the components use
 function toClientRoute(route) {
@@ -52,11 +52,6 @@ function toApiRoute(route) {
 }
 
 export const getRoutes = async () => (await request('/routes')).map(toClientRoute)
-
-export const getHolds = () => request('/holds')
-
-export const getWallTypes = async () =>
-  (await request('/wall-types')).map((type) => ({ ...type, name: capitalize(type.name) }))
 
 export const createRoute = async (route) =>
   toClientRoute(await request('/routes', { method: 'POST', body: JSON.stringify(toApiRoute(route)) }))
