@@ -24,6 +24,8 @@ function toClientRoute(route) {
     wallType: capitalize(route.wall_type),
     holds: route.holds.map((hold) => ({
       holdId: hold.holdId,
+      imageUrl: hold.imageUrl,
+      size: hold.size,
       row: hold.gridRow,
       col: hold.gridCol,
       role: hold.role,
