@@ -1,4 +1,4 @@
-import { grades } from '../data/starterRoutes'
+import { grades } from '../data/grades'
 
 function GradeFilter({ grade, sort, onGradeChange, onSortChange }) {
   return (

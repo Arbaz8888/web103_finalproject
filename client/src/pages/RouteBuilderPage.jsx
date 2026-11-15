@@ -24,7 +24,7 @@ function RouteBuilderPage({ routes, onSave }) {
           <p className="builder-option-label">Design your own</p>
         </div>
       </div>
-      <RouteForm onSave={(route) => { onSave(route); navigate('/') }} />
+      <RouteForm onSave={async (route) => { await onSave(route); navigate('/') }} />
     </section>
   )
 }
