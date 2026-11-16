@@ -1,18 +1,22 @@
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
-function Navbar() {
+function Navbar({ routeCount }) {
   return (
     <header className="site-header">
-      <Link className="brand" to="/">
-        <span className="brand-mark">◈</span>
-        <span>Crux Maker</span>
-      </Link>
-      <nav aria-label="Main navigation">
-        <Link to="/">Route Gallery</Link>
-        <Link className="button button-primary" to="/routes/new">
-          Build a route
+      <div className="site-header-inner">
+        <Link className="brand" to="/" aria-label="Crux Maker home">
+          <span className="brand-mark" aria-hidden="true">◈</span>
+          <span>Crux<span className="brand-light">Maker</span></span>
         </Link>
-      </nav>
+        <nav aria-label="Main navigation">
+          <NavLink className="nav-link" to="/" end>
+            Routes{routeCount != null && <span className="nav-count">{routeCount}</span>}
+          </NavLink>
+          <NavLink className="button button-primary button-sm" to="/routes/new">
+            <span aria-hidden="true">＋</span> Build a route
+          </NavLink>
+        </nav>
+      </div>
     </header>
   )
 }

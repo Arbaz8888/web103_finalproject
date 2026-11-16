@@ -3,46 +3,133 @@ import { Link } from 'react-router-dom'
 import GradeFilter from '../components/GradeFilter'
 import QuickLookModal from '../components/QuickLookModal'
 import RouteGallery from '../components/RouteGallery'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
+import GradeBadge from '../components/GradeBadge'
+import Wall3DLazy from '../components/Wall3DLazy'
 import { grades } from '../data/grades'
+import { useToast } from '../hooks/useToast'
+import { usePageTitle } from '../hooks/usePageTitle'
+
+const EMPTY_FILTERS = { query: '', grade: '', wallType: '', sort: 'newest' }
 
 function RouteGalleryPage({ routes, onReset }) {
-  const [grade, setGrade] = useState('All grades')
-  const [sort, setSort] = useState('easiest')
+  usePageTitle('Route gallery')
+  const toast = useToast()
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [previewRoute, setPreviewRoute] = useState(null)
-  const [error, setError] = useState('')
+  const [confirmReset, setConfirmReset] = useState(false)
+
+  // Routes arrive newest first from the API, so "newest" keeps that order
   const visibleRoutes = useMemo(() => {
-    const filtered = grade === 'All grades' ? [...routes] : routes.filter((route) => route.grade === grade)
-    return filtered.sort((a, b) => (sort === 'easiest' ? 1 : -1) * (grades.indexOf(a.grade) - grades.indexOf(b.grade)))
-  }, [grade, routes, sort])
+    const query = filters.query.trim().toLowerCase()
+    const filtered = routes.filter(
+      (route) =>
+        (!query || route.name.toLowerCase().includes(query)) &&
+        (!filters.grade || route.grade === filters.grade) &&
+        (!filters.wallType || route.wallType === filters.wallType),
+    )
+    if (filters.sort === 'newest') return filtered
+    const direction = filters.sort === 'easiest' ? 1 : -1
+    return [...filtered].sort((a, b) => direction * (grades.indexOf(a.grade) - grades.indexOf(b.grade)))
+  }, [filters, routes])
+
+  const stats = useMemo(() => {
+    const sorted = routes.map((route) => grades.indexOf(route.grade)).sort((a, b) => a - b)
+    return {
+      routes: routes.length,
+      holds: routes.reduce((sum, route) => sum + route.holds.length, 0),
+      range: sorted.length ? `${grades[sorted[0]]}–${grades[sorted[sorted.length - 1]]}` : '—',
+      walls: new Set(routes.map((route) => route.wallType)).size,
+    }
+  }, [routes])
+
+  // The busiest route makes the best-looking homepage wall
+  const featured = useMemo(() => routes.reduce((best, route) => (!best || route.holds.length > best.holds.length ? route : best), null), [routes])
 
   async function handleReset() {
-    if (!window.confirm('Reset the wall? This deletes all routes and brings back the starter routes.')) return
     try {
       await onReset()
-      setError('')
+      setFilters(EMPTY_FILTERS)
+      toast('Wall reset to the starter routes')
     } catch (err) {
-      setError(err.message)
+      toast(err.message, 'error')
+    } finally {
+      setConfirmReset(false)
     }
   }
 
   return (
     <>
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">TRAINING WALL / ROUTE LIBRARY</p>
-          <h1>Find your next problem.</h1>
-          <p className="lede">Browse routes built by your crew and find a challenge at your level.</p>
+      <section className="hero">
+        <div className="hero-copy">
+          <p className="eyebrow">BOULDERING ROUTE BUILDER</p>
+          <h1>Build bouldering routes on a <span className="accent-text">virtual wall.</span></h1>
+          <p className="lede">Pick holds, place them on a 12 × 16 bolt grid, mark the start and finish, and set the wall angle. Sketch a route here before you set it on a real wall.</p>
+          <div className="hero-actions">
+            <Link className="button button-primary button-lg" to="/routes/new">＋ Build a route</Link>
+            <a className="button button-ghost button-lg" href="#routes">See saved routes ↓</a>
+          </div>
+          <dl className="hero-stats">
+            <div><dt>Routes built</dt><dd>{stats.routes}</dd></div>
+            <div><dt>Grade range</dt><dd>{stats.range}</dd></div>
+            <div><dt>Holds placed</dt><dd>{stats.holds}</dd></div>
+            <div><dt>Wall types</dt><dd>{stats.walls}</dd></div>
+          </dl>
         </div>
-        <div className="heading-actions">
-          <button className="button button-reset" onClick={handleReset} type="button">⟳ Reset wall</button>
-          <Link className="button button-primary" to="/routes/new">＋ New route</Link>
+        <div className="hero-stage">
+          {featured ? (
+            <>
+              <Wall3DLazy key={featured.id} holds={featured.holds} angle={featured.angle} wallType={featured.wallType} showcase fallbackClassName="wall-3d-showcase" />
+              <Link className="featured-chip" to={`/routes/${featured.id}`}>
+                <span className="featured-label">Featured route</span>
+                <strong>{featured.name}</strong>
+                <GradeBadge grade={featured.grade} />
+                <span className="featured-arrow" aria-hidden="true">→</span>
+              </Link>
+            </>
+          ) : (
+            <div className="wall-3d wall-3d-showcase wall-3d-loading">Build a route to see it here in 3D</div>
+          )}
         </div>
       </section>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <GradeFilter grade={grade} sort={sort} onGradeChange={setGrade} onSortChange={setSort} />
-      <p className="route-count">{visibleRoutes.length} routes</p>
-      <RouteGallery routes={visibleRoutes} onQuickLook={setPreviewRoute} />
-      {previewRoute && <QuickLookModal route={previewRoute} onClose={() => setPreviewRoute(null)} />}
+
+      <div className="section-heading" id="routes">
+        <h2>Saved routes</h2>
+        <span className="muted">
+          Showing {visibleRoutes.length} of {routes.length}
+        </span>
+        <button className="button button-ghost button-sm push-right" onClick={() => setConfirmReset(true)} type="button">
+          ⟳ Reset wall
+        </button>
+      </div>
+
+      <GradeFilter routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))} />
+
+      {routes.length === 0 ? (
+        <section className="empty-panel">
+          <h3>No routes yet.</h3>
+          <p className="muted">Build the first route, or reset the wall to bring back the starter routes.</p>
+          <Link className="button button-primary" to="/routes/new">Build the first route</Link>
+        </section>
+      ) : visibleRoutes.length === 0 ? (
+        <section className="empty-panel">
+          <h3>No routes match.</h3>
+          <p className="muted">Try a different grade or wall type, or clear your filters.</p>
+          <button className="button button-ghost" type="button" onClick={() => setFilters(EMPTY_FILTERS)}>Clear filters</button>
+        </section>
+      ) : (
+        <RouteGallery routes={visibleRoutes} onQuickLook={setPreviewRoute} />
+      )}
+
+      <QuickLookModal route={previewRoute} onClose={() => setPreviewRoute(null)} />
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset the wall?"
+        message="This deletes every route and brings back the starter routes. It can't be undone."
+        confirmLabel="Reset wall"
+        onConfirm={handleReset}
+        onClose={() => setConfirmReset(false)}
+      />
     </>
   )
 }

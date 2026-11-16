@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchHolds } from '../api/holds'
 import { SIZES } from '../utils/holdFootprint'
+import { ROLE_COLORS } from '../data/grades'
 
 const HOLD_TYPES = ['crimp', 'jug', 'sloper', 'pocket', 'pinch']
 const ROLES = ['start', 'hand', 'foot', 'finish']
@@ -45,7 +46,17 @@ function ClimbingHoldsDrawer({ selectedHold, onSelectHold, role, onRoleChange, r
 
   return (
     <div className="holds-drawer">
-      <p className="holds-drawer-title">Hold drawer</p>
+      <div className="holds-drawer-head">
+        <p className="holds-drawer-title">Hold drawer</p>
+        {selectedHold ? (
+          <span className="holds-drawer-picked">
+            <img src={selectedHold.imageUrl} alt="" style={{ transform: `rotate(${rotation}deg)` }} />
+            {selectedHold.name}
+          </span>
+        ) : (
+          <span className="holds-drawer-picked muted">Nothing picked</span>
+        )}
+      </div>
 
       {status === 'loading' && <p className="holds-drawer-note">Loading holds…</p>}
       {status === 'error' && (
@@ -94,7 +105,9 @@ function ClimbingHoldsDrawer({ selectedHold, onSelectHold, role, onRoleChange, r
         <legend>Role</legend>
         <div className="role-picker">
           {ROLES.map((item) => (
-            <button className={role === item ? 'selected' : ''} key={item} onClick={() => onRoleChange(item)} type="button">{item}</button>
+            <button className={role === item ? 'selected' : ''} aria-pressed={role === item} key={item} onClick={() => onRoleChange(item)} type="button">
+              <i className="dot" style={{ background: ROLE_COLORS[item] }} />{item}
+            </button>
           ))}
         </div>
       </fieldset>
@@ -102,7 +115,7 @@ function ClimbingHoldsDrawer({ selectedHold, onSelectHold, role, onRoleChange, r
         <legend>Rotation</legend>
         <div className="role-picker rotation-picker">
           {ROTATIONS.map((degrees) => (
-            <button className={rotation === degrees ? 'selected' : ''} key={degrees} onClick={() => onRotationChange(degrees)} type="button">{degrees}°</button>
+            <button className={rotation === degrees ? 'selected' : ''} aria-pressed={rotation === degrees} key={degrees} onClick={() => onRotationChange(degrees)} type="button">{degrees}°</button>
           ))}
         </div>
       </fieldset>
