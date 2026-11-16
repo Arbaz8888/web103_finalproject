@@ -18,6 +18,8 @@ const SELECT_ROUTES = `
 					'holdId', rh.hold_id,
 					'imageUrl', ch.image_url,
 					'size', ch.size,
+					'holdType', ch.hold_type,
+					'color', ch.color,
 					'gridRow', rh.grid_row,
 					'gridCol', rh.grid_col,
 					'role', rh.role,

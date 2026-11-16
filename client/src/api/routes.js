@@ -26,6 +26,8 @@ function toClientRoute(route) {
       holdId: hold.holdId,
       imageUrl: hold.imageUrl,
       size: hold.size,
+      holdType: hold.holdType,
+      color: hold.color,
       row: hold.gridRow,
       col: hold.gridCol,
       role: hold.role,
