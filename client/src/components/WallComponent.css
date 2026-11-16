@@ -1,0 +1,41 @@
+/* 2D wall: 12 x 16 T-nut bolt grid, placed holds with role glows, legend */
+.wall-stage { background: radial-gradient(120% 70% at 50% 0%, #262c31, var(--bg-raised) 70%); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 24px; position: relative; }
+.wall { aspect-ratio: 3 / 4; background-color: #c9c4b8; background-image: radial-gradient(rgba(0,0,0,.05) 1px, transparent 1.5px), linear-gradient(110deg, #b4afa3 0%, #d8d3c7 50%, #b0ab9f 100%); background-size: 5px 5px, 100% 100%; border: 8px solid #5f5a52; border-radius: 6px; box-shadow: inset 0 0 40px rgba(60,55,48,.6), 0 30px 60px -30px rgba(0,0,0,.9); display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(16, 1fr); padding: 6px; width: 100%; }
+.wall-sm { border-width: 5px; border-radius: 4px; padding: 3px; }
+.wall-frame { width: 100%; }
+.wall-frame-md { max-width: 520px; }
+.wall-frame-lg { max-width: 640px; margin: 0 auto; }
+.wall-profile { align-items: center; color: var(--muted); display: flex; font-family: 'DM Mono', monospace; font-size: .75rem; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
+.wall-profile svg { height: 30px; overflow: visible; width: 36px; }
+.wall-frame-sm .wall-profile { font-size: .68rem; gap: 6px; margin-bottom: 6px; }
+.wall-frame-sm .wall-profile svg { height: 22px; width: 27px; }
+.wall-profile-floor { stroke: var(--faint); stroke-width: 2; }
+.wall-profile-ref { stroke: var(--faint); stroke-dasharray: 2 2; stroke-width: 1.5; }
+.wall-profile-wall { stroke: var(--accent); stroke-linecap: round; stroke-width: 4; }
+.wall-cell { align-items: center; background: transparent; border: 0; display: flex; justify-content: center; min-height: 0; min-width: 0; padding: 0; position: relative; }
+.wall-editable .wall-cell { cursor: pointer; }
+.wall-editable .wall-cell-blocked { cursor: not-allowed; }
+.wall-editable .wall-cell-blocked .wall-bolt { opacity: .2; }
+.wall-bolt { background: radial-gradient(circle, #3d3a34 35%, #8a857a 75%); border-radius: 50%; height: 16%; opacity: .45; transition: opacity .15s, transform .15s, box-shadow .15s; width: 16%; }
+.wall-editable .wall-bolt { height: 20%; opacity: .6; width: 20%; }
+.wall-editable .wall-cell:hover .wall-bolt, .wall-editable .wall-cell:focus-visible .wall-bolt { box-shadow: 0 0 0 3px var(--accent); opacity: 1; transform: scale(1.5); }
+.wall-cell:focus-visible { outline: none; }
+.wall-hold { height: var(--hold-scale); max-width: none; object-fit: contain; pointer-events: none; position: absolute; transition: filter .15s, transform .15s; user-select: none; width: var(--hold-scale); z-index: 1; }
+.wall-hold-hit { border-radius: 50%; height: calc(var(--hold-scale) * .8); position: absolute; width: calc(var(--hold-scale) * .8); z-index: 1; }
+.wall-editable .wall-cell:hover .wall-hold, .wall-editable .wall-cell:hover .wall-hold-hit { z-index: 2; }
+.wall-editable .wall-cell:hover .role-any, .wall-editable .wall-cell:focus-visible .role-any { filter: drop-shadow(0 0 3px var(--accent)); }
+.role-any { filter: drop-shadow(1px 2px 2px rgba(40,36,30,.55)); }
+.role-start { filter: drop-shadow(0 0 2px #eab308) drop-shadow(0 0 4px #eab308); }
+.role-hand { filter: drop-shadow(0 0 2px #3b82f6) drop-shadow(0 0 4px #3b82f6); }
+.role-foot { filter: drop-shadow(0 0 2px #16a34a) drop-shadow(0 0 4px #16a34a); }
+.role-finish { filter: drop-shadow(0 0 2px #dc2626) drop-shadow(0 0 4px #dc2626); }
+.hold-legend { color: var(--muted); display: flex; flex-wrap: wrap; font-size: .8rem; gap: 18px; justify-content: center; margin-top: 18px; text-transform: capitalize; }
+.hold-legend span { align-items: center; display: flex; gap: 7px; }
+.legend-dot { border-radius: 50%; display: inline-block; height: 9px; width: 9px; }
+/* The hold being edited in the builder */
+.wall-editable .wall-cell-selected { z-index: 3; }
+.wall-editable .wall-cell-selected::after { animation: selected-pulse 1.6s ease-in-out infinite; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent); content: ''; height: calc(var(--hold-scale, 160%) * .9); pointer-events: none; position: absolute; width: calc(var(--hold-scale, 160%) * .9); }
+@keyframes selected-pulse { 50% { opacity: .55; } }
+@media (max-width: 640px) {
+  .wall-stage { padding: 14px; }
+}

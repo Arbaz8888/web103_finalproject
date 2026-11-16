@@ -1,16 +1,20 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import RouteForm from '../components/RouteForm'
 import NotFoundPage from './NotFoundPage'
+import { useRoute } from '../hooks/useRoute'
 import { useToast } from '../hooks/useToast'
 import { usePageTitle } from '../hooks/usePageTitle'
 
-function EditRoutePage({ routes, onSave }) {
+function EditRoutePage({ onSave }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
-  const route = routes.find((item) => item.id === Number(id))
-  usePageTitle(route ? `Edit ${route.name}` : 'Route not found')
-  if (!route) return <NotFoundPage message="That route doesn't exist, or it was deleted." />
+  const { status, route, error } = useRoute(id)
+  usePageTitle(route ? `Edit ${route.name}` : status === 'loading' ? 'Loading route' : 'Route not found')
+
+  if (status === 'loading') return <div className="skeleton skeleton-details" aria-busy="true" aria-label="Loading route" />
+  if (status === 'missing') return <NotFoundPage message="That route doesn't exist, or it was deleted." />
+  if (status === 'error') return <p className="form-error" role="alert">Could not load this route: {error}</p>
 
   async function handleSave(updatedRoute) {
     await onSave(updatedRoute)
@@ -34,7 +38,7 @@ function EditRoutePage({ routes, onSave }) {
         </div>
         <Link className="button button-ghost" to={`/routes/${route.id}`}>Cancel</Link>
       </div>
-      <RouteForm existing={route} onSave={handleSave} submitLabel="Save changes" />
+      <RouteForm key={route.id} existing={route} onSave={handleSave} submitLabel="Save changes" />
     </section>
   )
 }

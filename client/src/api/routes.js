@@ -13,6 +13,9 @@ export async function request(path, options = {}) {
 
 export const capitalize = (word) => word.charAt(0).toUpperCase() + word.slice(1)
 
+// Any angle -> 0..359 (some starter routes store negative rotations like -10)
+export const normalizeRotation = (degrees = 0) => ((Math.round(degrees) % 360) + 360) % 360
+
 // API route -> the shape the components use
 function toClientRoute(route) {
   return {
@@ -31,7 +34,7 @@ function toClientRoute(route) {
       row: hold.gridRow,
       col: hold.gridCol,
       role: hold.role,
-      rotation: hold.rotation,
+      rotation: normalizeRotation(hold.rotation),
     })),
   }
 }
@@ -48,12 +51,14 @@ function toApiRoute(route) {
       gridRow: hold.row,
       gridCol: hold.col,
       role: hold.role,
-      rotation: hold.rotation ?? 0,
+      rotation: normalizeRotation(hold.rotation),
     })),
   }
 }
 
 export const getRoutes = async () => (await request('/routes')).map(toClientRoute)
+
+export const getRoute = async (id) => toClientRoute(await request(`/routes/${id}`))
 
 export const createRoute = async (route) =>
   toClientRoute(await request('/routes', { method: 'POST', body: JSON.stringify(toApiRoute(route)) }))

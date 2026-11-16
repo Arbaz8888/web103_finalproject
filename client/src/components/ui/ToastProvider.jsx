@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { ToastContext } from '../../hooks/useToast'
+import './ToastProvider.css'
 
 let nextId = 1
 

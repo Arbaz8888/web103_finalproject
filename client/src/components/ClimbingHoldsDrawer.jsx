@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchHolds } from '../api/holds'
-import { SIZES } from '../utils/holdFootprint'
-import { ROLE_COLORS } from '../data/grades'
+import { useCatalog } from '../hooks/useCatalog'
+import './ClimbingHoldsDrawer.css'
 
-const HOLD_TYPES = ['crimp', 'jug', 'sloper', 'pocket', 'pinch']
-const ROLES = ['start', 'hand', 'foot', 'finish']
-const ROTATIONS = [0, 45, 90, 135, 180, 225, 270, 315]
-
-// Paintbrush palette: pick a hold, role and rotation here, then click a bolt on the wall.
-function ClimbingHoldsDrawer({ selectedHold, onSelectHold, role, onRoleChange, rotation, onRotationChange }) {
+// Pick a hold from the catalog, then tap bolts on the wall to place it.
+// Role and rotation are set on each placed hold afterwards, not here.
+function ClimbingHoldsDrawer({ selectedHold, onSelectHold }) {
+  const { holdTypes, holdSizes } = useCatalog()
   const [holds, setHolds] = useState([])
   const [status, setStatus] = useState('loading')
   const [activeType, setActiveType] = useState(null)
@@ -28,36 +26,24 @@ function ClimbingHoldsDrawer({ selectedHold, onSelectHold, role, onRoleChange, r
     }
   }, [attempt])
 
-  // One section per hold type, each ordered small -> large.
-  const sections = useMemo(() => {
-    const byType = new Map()
-    for (const hold of holds) {
-      if (!byType.has(hold.holdType)) byType.set(hold.holdType, [])
-      byType.get(hold.holdType).push(hold)
-    }
-    const types = [...HOLD_TYPES.filter((type) => byType.has(type)), ...[...byType.keys()].filter((type) => !HOLD_TYPES.includes(type))]
-    return types.map((type) => ({
-      type,
-      holds: byType.get(type).sort((a, b) => SIZES.indexOf(a.size) - SIZES.indexOf(b.size)),
-    }))
-  }, [holds])
+  // One tab per hold type in the backend's order, each ordered small -> large
+  const sections = useMemo(
+    () =>
+      holdTypes
+        .map((type) => ({
+          type,
+          holds: holds
+            .filter((hold) => hold.holdType === type)
+            .sort((a, b) => holdSizes.indexOf(a.size) - holdSizes.indexOf(b.size)),
+        }))
+        .filter((section) => section.holds.length > 0),
+    [holds, holdTypes, holdSizes],
+  )
 
   const current = sections.find((section) => section.type === activeType) ?? sections[0]
 
   return (
     <div className="holds-drawer">
-      <div className="holds-drawer-head">
-        <p className="holds-drawer-title">Hold drawer</p>
-        {selectedHold ? (
-          <span className="holds-drawer-picked">
-            <img src={selectedHold.imageUrl} alt="" style={{ transform: `rotate(${rotation}deg)` }} />
-            {selectedHold.name}
-          </span>
-        ) : (
-          <span className="holds-drawer-picked muted">Nothing picked</span>
-        )}
-      </div>
-
       {status === 'loading' && <p className="holds-drawer-note">Loading holds…</p>}
       {status === 'error' && (
         <div className="holds-drawer-note" role="alert">
@@ -94,31 +80,12 @@ function ClimbingHoldsDrawer({ selectedHold, onSelectHold, role, onRoleChange, r
                 type="button"
               >
                 <img src={hold.imageUrl} alt="" draggable={false} />
-                <span>{hold.size}</span>
+                <span>{hold.name}</span>
               </button>
             ))}
           </div>
         </>
       )}
-
-      <fieldset>
-        <legend>Role</legend>
-        <div className="role-picker">
-          {ROLES.map((item) => (
-            <button className={role === item ? 'selected' : ''} aria-pressed={role === item} key={item} onClick={() => onRoleChange(item)} type="button">
-              <i className="dot" style={{ background: ROLE_COLORS[item] }} />{item}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Rotation</legend>
-        <div className="role-picker rotation-picker">
-          {ROTATIONS.map((degrees) => (
-            <button className={rotation === degrees ? 'selected' : ''} aria-pressed={rotation === degrees} key={degrees} onClick={() => onRotationChange(degrees)} type="button">{degrees}°</button>
-          ))}
-        </div>
-      </fieldset>
     </div>
   )
 }

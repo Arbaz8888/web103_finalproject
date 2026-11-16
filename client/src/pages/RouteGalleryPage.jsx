@@ -6,15 +6,17 @@ import RouteGallery from '../components/RouteGallery'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import GradeBadge from '../components/GradeBadge'
 import Wall3DLazy from '../components/Wall3DLazy'
-import { grades } from '../data/grades'
+import { useCatalog } from '../hooks/useCatalog'
 import { useToast } from '../hooks/useToast'
 import { usePageTitle } from '../hooks/usePageTitle'
+import './RouteGalleryPage.css'
 
 const EMPTY_FILTERS = { query: '', grade: '', wallType: '', sort: 'newest' }
 
 function RouteGalleryPage({ routes, onReset }) {
   usePageTitle('Route gallery')
   const toast = useToast()
+  const { grades } = useCatalog()
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [previewRoute, setPreviewRoute] = useState(null)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -31,7 +33,7 @@ function RouteGalleryPage({ routes, onReset }) {
     if (filters.sort === 'newest') return filtered
     const direction = filters.sort === 'easiest' ? 1 : -1
     return [...filtered].sort((a, b) => direction * (grades.indexOf(a.grade) - grades.indexOf(b.grade)))
-  }, [filters, routes])
+  }, [filters, grades, routes])
 
   const stats = useMemo(() => {
     const sorted = routes.map((route) => grades.indexOf(route.grade)).sort((a, b) => a - b)
@@ -41,7 +43,7 @@ function RouteGalleryPage({ routes, onReset }) {
       range: sorted.length ? `${grades[sorted[0]]}–${grades[sorted[sorted.length - 1]]}` : '—',
       walls: new Set(routes.map((route) => route.wallType)).size,
     }
-  }, [routes])
+  }, [grades, routes])
 
   // The busiest route makes the best-looking homepage wall
   const featured = useMemo(() => routes.reduce((best, route) => (!best || route.holds.length > best.holds.length ? route : best), null), [routes])

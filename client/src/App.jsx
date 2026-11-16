@@ -3,13 +3,15 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import ToastProvider from './components/ui/ToastProvider'
 import * as api from './api/routes'
+import { getOptions } from './api/options'
+import { getWallTypes } from './api/wallTypes'
+import { CatalogContext } from './hooks/useCatalog'
 import EditRoutePage from './pages/EditRoutePage'
 import RouteBuilderPage from './pages/RouteBuilderPage'
 import RouteDetailsPage from './pages/RouteDetailsPage'
 import RouteGalleryPage from './pages/RouteGalleryPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { usePointerGlow } from './hooks/usePointerGlow'
-import './App.css'
 
 // Jump back to the top whenever the page changes
 function ScrollToTop() {
@@ -37,47 +39,54 @@ function GallerySkeleton() {
 function App() {
   usePointerGlow()
   const [routes, setRoutes] = useState([])
+  const [catalog, setCatalog] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const fetchRoutes = useCallback(() => {
-    api.getRoutes()
-      .then(setRoutes)
+  // Routes plus everything the backend allows (grades, roles, hold types/sizes, wall types)
+  const fetchAll = useCallback(() => {
+    Promise.all([api.getRoutes(), getOptions(), getWallTypes()])
+      .then(([routeList, options, wallTypes]) => {
+        setRoutes(routeList)
+        setCatalog({ ...options, wallTypes })
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    fetchRoutes()
-  }, [fetchRoutes])
+    fetchAll()
+  }, [fetchAll])
 
-  function loadRoutes() {
+  function retry() {
     setLoading(true)
     setError('')
-    fetchRoutes()
+    fetchAll()
   }
+
+  // After any change, reload the list from the backend instead of patching a local copy
+  const refreshRoutes = async () => setRoutes(await api.getRoutes())
 
   // Returns the saved route so pages can navigate to it. Errors bubble up to RouteForm.
   async function saveRoute(route) {
     const saved = route.id ? await api.updateRoute(route) : await api.createRoute(route)
-    setRoutes((current) =>
-      route.id ? current.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...current]
-    )
+    await refreshRoutes()
     return saved
   }
 
   async function deleteRoute(id) {
     await api.deleteRoute(id)
-    setRoutes((current) => current.filter((route) => route.id !== id))
+    await refreshRoutes()
   }
 
   async function resetRoutes() {
     await api.resetRoutes()
-    setRoutes(await api.getRoutes())
+    await refreshRoutes()
   }
 
   return (
     <BrowserRouter>
+      <CatalogContext.Provider value={catalog}>
       <ToastProvider>
         <ScrollToTop />
         <a className="skip-link" href="#main">Skip to content</a>
@@ -90,14 +99,14 @@ function App() {
               <p className="eyebrow">ERROR</p>
               <h1>Couldn't load routes.</h1>
               <p className="lede">{error}</p>
-              <button className="button button-primary" type="button" onClick={loadRoutes}>Try again</button>
+              <button className="button button-primary" type="button" onClick={retry}>Try again</button>
             </section>
           ) : (
             <Routes>
               <Route path="/" element={<RouteGalleryPage routes={routes} onReset={resetRoutes} />} />
               <Route path="/routes/new" element={<RouteBuilderPage routes={routes} onSave={saveRoute} />} />
-              <Route path="/routes/:id" element={<RouteDetailsPage routes={routes} onDelete={deleteRoute} />} />
-              <Route path="/routes/:id/edit" element={<EditRoutePage routes={routes} onSave={saveRoute} />} />
+              <Route path="/routes/:id" element={<RouteDetailsPage onDelete={deleteRoute} />} />
+              <Route path="/routes/:id/edit" element={<EditRoutePage onSave={saveRoute} />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           )}
@@ -107,6 +116,7 @@ function App() {
           <span>Build bouldering routes on a virtual wall.</span>
         </footer>
       </ToastProvider>
+      </CatalogContext.Provider>
     </BrowserRouter>
   )
 }

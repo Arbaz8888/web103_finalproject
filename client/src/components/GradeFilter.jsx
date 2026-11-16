@@ -1,4 +1,5 @@
-import { grades } from '../data/grades'
+import { useCatalog } from '../hooks/useCatalog'
+import './GradeFilter.css'
 
 const SORTS = [
   { id: 'newest', label: 'Newest' },
@@ -9,8 +10,10 @@ const SORTS = [
 // Search, grade chips, wall type chips and sort for the gallery
 function GradeFilter({ routes, filters, onChange, onClear }) {
   const { query, grade, wallType, sort } = filters
+  const { grades, wallTypes: allWallTypes } = useCatalog()
   const gradeCounts = Object.fromEntries(grades.map((item) => [item, routes.filter((route) => route.grade === item).length]))
-  const wallTypes = [...new Set(routes.map((route) => route.wallType))].sort()
+  const wallTypes = allWallTypes.map((type) => type.name)
+  const wallCounts = Object.fromEntries(wallTypes.map((item) => [item, routes.filter((route) => route.wallType === item).length]))
   const active = query || grade || wallType
 
   return (
@@ -55,8 +58,16 @@ function GradeFilter({ routes, filters, onChange, onClear }) {
       <div className="chip-row" role="group" aria-label="Filter by wall type">
         <button className="chip" type="button" aria-pressed={!wallType} onClick={() => onChange({ wallType: '' })}>Any wall</button>
         {wallTypes.map((item) => (
-          <button key={item} className="chip" type="button" aria-pressed={wallType === item} onClick={() => onChange({ wallType: wallType === item ? '' : item })}>
+          <button
+            key={item}
+            className="chip"
+            type="button"
+            aria-pressed={wallType === item}
+            disabled={wallCounts[item] === 0 && wallType !== item}
+            onClick={() => onChange({ wallType: wallType === item ? '' : item })}
+          >
             {item}
+            {wallCounts[item] > 0 && <span className="chip-count">{wallCounts[item]}</span>}
           </button>
         ))}
         {active && <button className="chip-clear" type="button" onClick={onClear}>Clear filters</button>}

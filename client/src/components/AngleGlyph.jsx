@@ -1,3 +1,5 @@
+import './AngleGlyph.css'
+
 // Tiny side-on sketch of a wall angle: floor, dashed vertical, and the wall leaning to `angle`
 function AngleGlyph({ angle = 0, className = '' }) {
   const radians = (Math.max(-90, Math.min(90, angle)) * Math.PI) / 180

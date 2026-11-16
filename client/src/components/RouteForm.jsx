@@ -2,24 +2,24 @@ import { useEffect, useRef, useState } from 'react'
 import WallComponent from './WallComponent'
 import HoldLegend from './Hold'
 import AngleGlyph from './AngleGlyph'
-import { getWallTypes } from '../api/wallTypes'
-import { gradeTone, grades, ROLE_COLORS } from '../data/grades'
 import ClimbingHoldsDrawer from './ClimbingHoldsDrawer'
+import RotationDial from './RotationDial'
 import ViewToggle from './ViewToggle'
 import Wall3DLazy from './Wall3DLazy'
-import { findOverlappingHold, getHoldSize, SIZES } from '../utils/holdFootprint'
+import { useCatalog } from '../hooks/useCatalog'
+import { normalizeRotation } from '../api/routes'
+import { gradeTone, roleColor } from '../utils/display'
+import './RouteForm.css'
 
-const ROLES = ['start', 'hand', 'foot', 'finish']
+const DEFAULT_ROLE = 'hand'
 const isTyping = (target) => ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable
+const sameSpot = (a, b) => a && b && a.row === b.row && a.col === b.col
 
 function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
+  const { grades, holdRoles, wallTypes, maxStartHolds, finishHolds } = useCatalog()
   const [name, setName] = useState(existing?.name ?? '')
-  const [grade, setGrade] = useState(existing?.grade ?? 'V0')
-  const [wallTypeId, setWallTypeId] = useState(existing?.wallTypeId ?? null)
+  const [grade, setGrade] = useState(existing?.grade ?? grades[0])
   const [angle, setAngle] = useState(existing?.angle ?? 0)
-  const [wallTypes, setWallTypes] = useState([])
-  const [role, setRole] = useState('hand')
-  const [rotation, setRotation] = useState(0)
   const [catalogHold, setCatalogHold] = useState(null)
   const [holds, setHolds] = useState(existing?.holds ?? [])
   const [history, setHistory] = useState([])
@@ -29,29 +29,35 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
   const [view, setView] = useState('2D')
   const wallRef = useRef(null)
   const drawerRef = useRef(null)
-  const selectedHold = selectedCell && holds.find((hold) => hold.row === selectedCell.row && hold.col === selectedCell.col)
-  const wallType = wallTypes.find((type) => type.id === wallTypeId)
+  // True while the rotation knob is being dragged, so one drag is one undo step
+  const rotating = useRef(false)
+
+  const selectedHold = holds.find((hold) => sameSpot(hold, selectedCell))
+  // One slider covers every wall type; the type follows from the angle
+  const minAngle = Math.min(...wallTypes.map((type) => type.min_angle))
+  const maxAngle = Math.max(...wallTypes.map((type) => type.max_angle))
+  const wallType = wallTypes.find((type) => angle >= type.min_angle && angle <= type.max_angle)
+  const starts = holds.filter((hold) => hold.role === 'start').length
+  const finishes = holds.filter((hold) => hold.role === 'finish').length
 
   const checks = [
     { id: 'name', label: 'Route name', done: Boolean(name.trim()) },
-    { id: 'start', label: 'A start hold', done: holds.some((hold) => hold.role === 'start') },
-    { id: 'finish', label: 'A finish hold', done: holds.some((hold) => hold.role === 'finish') },
+    { id: 'start', label: maxStartHolds > 1 ? `1 or ${maxStartHolds} start holds` : '1 start hold', done: starts >= 1 && starts <= maxStartHolds },
+    { id: 'finish', label: `${finishHolds} finish hold`, done: finishes === finishHolds },
   ]
-  const ready = checks.every((check) => check.done) && Boolean(wallTypeId)
+  const ready = checks.every((check) => check.done) && Boolean(wallType)
 
-  // Load the wall type choices from the API
-  useEffect(() => {
-    getWallTypes()
-      .then((types) => {
-        setWallTypes(types)
-        setWallTypeId((current) => current ?? types.find((type) => type.name === 'Vertical')?.id ?? types[0]?.id)
-      })
-      .catch((err) => setError(err.message))
-  }, [])
+  // A role is unavailable for the selected hold when the route already has the most it allows
+  function roleDisabled(role, hold) {
+    if (hold.role === role) return false
+    if (role === 'start') return starts >= maxStartHolds
+    if (role === 'finish') return finishes >= finishHolds
+    return false
+  }
 
   // Every change to the holds goes through here so it can be undone
-  function commitHolds(next) {
-    setHistory((past) => [...past.slice(-49), holds])
+  function commitHolds(next, { record = true } = {}) {
+    if (record) setHistory((past) => [...past.slice(-49), holds])
     setHolds(next)
   }
 
@@ -59,25 +65,6 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     if (history.length === 0) return
     setHolds(history[history.length - 1])
     setHistory((past) => past.slice(0, -1))
-    setSelectedCell(null)
-  }
-
-  function handleWallTypeChange(id) {
-    const type = wallTypes.find((item) => item.id === id)
-    setWallTypeId(id)
-    if (type) setAngle(Math.min(Math.max(angle, type.min_angle), type.max_angle))
-  }
-
-  function handleCellClick(row, col) {
-    if (!catalogHold) {
-      setError('Pick a hold from the drawer first.')
-      return
-    }
-    setError('')
-    commitHolds([
-      ...holds,
-      { row, col, role, holdId: catalogHold.id, imageUrl: catalogHold.imageUrl, size: catalogHold.size, holdType: catalogHold.holdType, color: catalogHold.color, rotation },
-    ])
     setSelectedCell(null)
   }
 
@@ -90,22 +77,37 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     }
   }
 
-  function handlePlacedHoldClick(hold) {
-    setSelectedCell({ row: hold.row, col: hold.col })
+  // Place the picked hold, then select it so its role and rotation can be set
+  function handleCellClick(row, col) {
+    if (!catalogHold) {
+      setError('Pick a hold from the drawer first.')
+      return
+    }
+    setError('')
+    commitHolds([
+      ...holds,
+      {
+        row,
+        col,
+        role: DEFAULT_ROLE,
+        rotation: 0,
+        holdId: catalogHold.id,
+        imageUrl: catalogHold.imageUrl,
+        size: catalogHold.size,
+        holdType: catalogHold.holdType,
+        color: catalogHold.color,
+      },
+    ])
+    setSelectedCell({ row, col })
   }
 
-  function updateSelectedHold(changes) {
-    commitHolds(holds.map((hold) => (hold === selectedHold ? { ...hold, ...changes } : hold)))
+  function updateSelectedHold(changes, options) {
+    commitHolds(holds.map((hold) => (hold === selectedHold ? { ...hold, ...changes } : hold)), options)
   }
 
-  function rotateHold() {
-    updateSelectedHold({ rotation: ((selectedHold.rotation ?? 0) + 45) % 360 })
-  }
-
-  // A placed hold can only change to a size that still fits without overlapping its neighbors.
-  function sizeFits(size) {
-    const others = holds.filter((hold) => hold !== selectedHold)
-    return !findOverlappingHold(selectedHold.row, selectedHold.col, size, others)
+  function setRotation(degrees) {
+    updateSelectedHold({ rotation: normalizeRotation(degrees) }, { record: !rotating.current })
+    rotating.current = true
   }
 
   function removeHold() {
@@ -119,10 +121,10 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     setSelectedCell(null)
   }
 
-  // Keyboard shortcuts: Ctrl/Cmd+Z undo, Delete remove, R rotate, Escape deselect
+  // Keyboard shortcuts: Ctrl/Cmd+Z undo, Delete remove, R rotate 15°, Escape deselect
   useEffect(() => {
     function onKeyDown(event) {
-      if (isTyping(event.target)) return
+      if (isTyping(event.target) || event.target.getAttribute('role') === 'slider') return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault()
         undo()
@@ -130,7 +132,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
         event.preventDefault()
         removeHold()
       } else if (selectedHold && event.key.toLowerCase() === 'r') {
-        rotateHold()
+        updateSelectedHold({ rotation: normalizeRotation(selectedHold.rotation + 15) })
       } else if (event.key === 'Escape') {
         setSelectedCell(null)
       }
@@ -139,17 +141,13 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
+  // The Save button stays disabled until the checklist is complete
   async function handleSubmit(event) {
     event.preventDefault()
-    if (!ready) {
-      setError('Add a route name, at least one start hold, and a finish hold before saving.')
-      return
-    }
-
     setError('')
     setSaving(true)
     try {
-      await onSave({ id: existing?.id, name: name.trim(), grade, wallTypeId, angle, holds })
+      await onSave({ id: existing?.id, name: name.trim(), grade, wallTypeId: wallType.id, angle, holds })
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -161,22 +159,10 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
       <div className="builder-wall" ref={wallRef}>
         <div className="builder-toolbar">
           <ViewToggle view={view} onChange={(next) => { setView(next); setSelectedCell(null) }} />
-          <p className="wall-instruction" aria-live="polite">
-            {view === '3D' ? (
-              <>Live 3D preview. Switch to <strong>2D</strong> to place holds.</>
-            ) : selectedHold ? (
-              <>Editing a <strong>{selectedHold.role}</strong> hold. <kbd>R</kbd> rotate · <kbd>Del</kbd> remove · <kbd>Esc</kbd> done</>
-            ) : catalogHold ? (
-              <>Tap a bolt to place <strong>{catalogHold.name}</strong> as a <strong style={{ color: ROLE_COLORS[role] }}>{role}</strong> hold.</>
-            ) : (
-              'Pick a hold from the drawer, then tap a bolt to place it.'
-            )}
-          </p>
           <div className="builder-toolbar-actions">
             {catalogHold && (
               <button className="picked-chip" type="button" onClick={() => drawerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })} title="Change hold">
-                <img src={catalogHold.imageUrl} alt="" style={{ transform: `rotate(${rotation}deg)` }} />
-                <i className="dot" style={{ background: ROLE_COLORS[role] }} />
+                <img src={catalogHold.imageUrl} alt="" />
                 <span>Change hold</span>
               </button>
             )}
@@ -189,53 +175,78 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
           </div>
         </div>
 
+        {/* Editor for the selected hold; shows instructions when nothing is selected */}
+        <div className={`hold-editor${selectedHold && view === '2D' ? ' active' : ''}`} aria-live="polite">
+          {view === '3D' ? (
+            <p className="wall-instruction">Live 3D preview. Switch to <strong>2D</strong> to place and edit holds.</p>
+          ) : selectedHold ? (
+            <>
+              <div className="hold-editor-head">
+                <img src={selectedHold.imageUrl} alt="" style={{ transform: `rotate(${selectedHold.rotation}deg)` }} />
+                <span className="hold-editor-title">Selected hold</span>
+                <button className="button button-danger-ghost button-sm push-right" onClick={removeHold} type="button">Remove</button>
+                <button className="button button-primary button-sm" onClick={() => setSelectedCell(null)} type="button">Done</button>
+              </div>
+              <div className="hold-editor-body">
+                <div className="hold-editor-field">
+                  <span className="hold-editor-label">Role</span>
+                  <div className="segmented segmented-sm role-segmented" role="group" aria-label="Hold role">
+                    {holdRoles.map((item) => {
+                      const disabled = roleDisabled(item, selectedHold)
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          aria-pressed={selectedHold.role === item}
+                          disabled={disabled}
+                          title={disabled ? (item === 'start' ? `A route can have at most ${maxStartHolds} start holds` : `A route can have only ${finishHolds} finish hold`) : undefined}
+                          onClick={() => updateSelectedHold({ role: item })}
+                        >
+                          <i className="dot" style={{ background: roleColor(item) }} />{item}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="hold-editor-field">
+                  <span className="hold-editor-label">Rotation</span>
+                  <RotationDial
+                    value={selectedHold.rotation}
+                    imageUrl={selectedHold.imageUrl}
+                    onChange={setRotation}
+                    onChangeEnd={() => { rotating.current = false }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="wall-instruction">
+              {catalogHold ? (
+                <>Tap a bolt to place <strong>{catalogHold.name}</strong>, then set its role and rotation.</>
+              ) : (
+                'Pick a hold from the drawer, then tap a bolt to place it.'
+              )}
+              <span className="shortcut-hint"><kbd>R</kbd> rotate · <kbd>Del</kbd> remove · <kbd>Esc</kbd> deselect · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</span>
+            </p>
+          )}
+        </div>
+
         {view === '3D' ? (
           <Wall3DLazy holds={holds} wallType={wallType?.name} angle={angle} />
         ) : (
-        <div className="wall-stage">
-          {selectedHold && (
-            <div className="hold-popover" role="group" aria-label="Selected hold">
-              <div className="hold-popover-row">
-                <span className="hold-popover-label">Role</span>
-                <div className="segmented segmented-sm">
-                  {ROLES.map((item) => (
-                    <button key={item} type="button" aria-pressed={selectedHold.role === item} onClick={() => updateSelectedHold({ role: item })}>
-                      <i className="dot" style={{ background: ROLE_COLORS[item] }} />{item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="hold-popover-row">
-                <span className="hold-popover-label">Size</span>
-                <div className="segmented segmented-sm">
-                  {SIZES.map((item) => {
-                    const isCurrent = getHoldSize(selectedHold) === item
-                    const fits = isCurrent || sizeFits(item)
-                    return (
-                      <button
-                        aria-pressed={isCurrent}
-                        disabled={!fits}
-                        key={item}
-                        onClick={() => updateSelectedHold({ size: item })}
-                        title={fits ? `Make this a ${item} hold` : `A ${item} hold would overlap a neighboring hold`}
-                        type="button"
-                      >
-                        {item}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div className="hold-popover-row">
-                <button className="button button-ghost button-sm" onClick={rotateHold} type="button">↻ {selectedHold.rotation ?? 0}°</button>
-                <button className="button button-danger-ghost button-sm" onClick={removeHold} type="button">Remove</button>
-                <button className="button button-primary button-sm push-right" onClick={() => setSelectedCell(null)} type="button">Done</button>
-              </div>
-            </div>
-          )}
-          <WallComponent holds={holds} wallType={wallType?.name} angle={angle} placingSize={catalogHold?.size ?? 'medium'} editable onCellClick={handleCellClick} onPlacedHoldClick={handlePlacedHoldClick} />
-          <HoldLegend />
-        </div>
+          <div className="wall-stage">
+            <WallComponent
+              holds={holds}
+              wallType={wallType?.name}
+              angle={angle}
+              placingSize={catalogHold?.size ?? 'medium'}
+              selectedCell={selectedCell}
+              editable
+              onCellClick={handleCellClick}
+              onPlacedHoldClick={(hold) => setSelectedCell({ row: hold.row, col: hold.col })}
+            />
+            <HoldLegend />
+          </div>
         )}
       </div>
 
@@ -251,50 +262,51 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
             <legend>Grade</legend>
             <div className="grade-picker">
               {grades.map((item) => (
-                <button key={item} type="button" className={`grade-option grade-${gradeTone(item)}`} aria-pressed={grade === item} onClick={() => setGrade(item)}>
+                <button key={item} type="button" className={`grade-option grade-${gradeTone(item, grades)}`} aria-pressed={grade === item} onClick={() => setGrade(item)}>
                   {item}
                 </button>
               ))}
             </div>
           </fieldset>
 
-          <fieldset className="field">
-            <legend>Wall type</legend>
-            <div className="wall-type-picker">
-              {wallTypes.map((type) => (
-                <button key={type.id} type="button" aria-pressed={wallTypeId === type.id} onClick={() => handleWallTypeChange(type.id)} title={type.description}>
-                  <AngleGlyph angle={(type.min_angle + type.max_angle) / 2} />
-                  <strong>{type.name}</strong>
-                  <span>{type.min_angle}° to {type.max_angle}°</span>
-                </button>
-              ))}
-              {wallTypes.length === 0 && <p className="muted">Loading wall types…</p>}
-            </div>
-          </fieldset>
-
-          <label className="field">
-            <span className="field-row">Wall angle <output className="angle-value">{angle}°</output></span>
+          <div className="field">
+            <span className="field-row">
+              <label htmlFor="wall-angle">Wall angle</label>
+              <span className="wall-type-readout">
+                <AngleGlyph angle={angle} />
+                <strong>{wallType?.name ?? '—'}</strong>
+                <output htmlFor="wall-angle" className="angle-value">{angle}°</output>
+              </span>
+            </span>
             <input
+              id="wall-angle"
               className="range"
               type="range"
-              min={wallType?.min_angle ?? -20}
-              max={wallType?.max_angle ?? 90}
+              min={minAngle}
+              max={maxAngle}
               value={angle}
               onChange={(event) => setAngle(Number(event.target.value))}
+              aria-valuetext={`${angle} degrees, ${wallType?.name ?? 'unknown'} wall`}
             />
-          </label>
+            {/* Each wall type's share of the slider, from the wall_types table */}
+            <div className="wall-type-scale" aria-hidden="true">
+              {wallTypes.map((type) => (
+                <span
+                  key={type.id}
+                  className={type.id === wallType?.id ? 'current' : ''}
+                  style={{ flexGrow: type.max_angle - type.min_angle + 1 }}
+                >
+                  {type.name}
+                </span>
+              ))}
+            </div>
+            {wallType?.description && <p className="field-hint">{wallType.description}</p>}
+          </div>
         </section>
 
         <section className="panel" ref={drawerRef}>
-          <h2 className="panel-title"><span className="step">2</span> Place the holds</h2>
-          <ClimbingHoldsDrawer
-            selectedHold={catalogHold}
-            onSelectHold={handlePickHold}
-            role={role}
-            onRoleChange={setRole}
-            rotation={rotation}
-            onRotationChange={setRotation}
-          />
+          <h2 className="panel-title"><span className="step">2</span> Pick a hold</h2>
+          <ClimbingHoldsDrawer selectedHold={catalogHold} onSelectHold={handlePickHold} />
         </section>
 
         <section className="panel save-panel">
@@ -307,8 +319,8 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
                 <span className="sr-only">{check.done ? ' (done)' : ' (needed)'}</span>
               </li>
             ))}
-            <li className={holds.length > 0 ? 'done' : ''}><span className="check" aria-hidden="true">{holds.length > 0 ? '✓' : ''}</span>{holds.length} {holds.length === 1 ? 'hold' : 'holds'} placed</li>
           </ul>
+          <p className="muted checklist-count">{holds.length} {holds.length === 1 ? 'hold' : 'holds'} placed</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="button button-primary button-lg button-block" disabled={saving || !ready} type="submit">
             {saving ? 'Saving…' : submitLabel}

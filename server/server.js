@@ -4,6 +4,7 @@ import cors from 'cors';
 import HoldsRouter from './routes/holds.js';
 import WallTypesRouter from './routes/wallTypes.js';
 import ClimbingRoutesRouter from './routes/climbingRoutes.js';
+import OptionsRouter from './routes/options.js';
 
 const app = express();
 app.use(express.json());
@@ -12,6 +13,7 @@ app.use(cors());
 app.use('/api/holds', HoldsRouter);
 app.use('/api/wall-types', WallTypesRouter);
 app.use('/api/routes', ClimbingRoutesRouter);
+app.use('/api/options', OptionsRouter);
 
 const PORT = process.env.PORT || 3000;
 

@@ -1,0 +1,38 @@
+/* 3D wall: canvas and the glass overlays on top of it */
+.wall-3d:fullscreen { aspect-ratio: auto; border-radius: 0; height: 100%; }
+.wall-3d canvas { cursor: grab; }
+.wall-3d canvas:active { cursor: grabbing; }
+.w3d-top, .w3d-bottom { display: flex; gap: 10px; left: 14px; pointer-events: none; position: absolute; right: 14px; z-index: 2; }
+.w3d-top { align-items: flex-start; justify-content: space-between; top: 14px; }
+.w3d-bottom { align-items: center; bottom: 14px; flex-direction: column; }
+.w3d-top > *, .w3d-legend { pointer-events: auto; }
+.w3d-chip, .w3d-icon, .w3d-legend { backdrop-filter: blur(14px) saturate(1.3); background: rgba(22,26,29,.62); border: 1px solid rgba(255,255,255,.09); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.w3d-chip { align-items: center; border-radius: 12px; display: flex; gap: 10px; padding: 8px 12px 8px 9px; }
+.w3d-chip div { display: flex; flex-direction: column; line-height: 1.15; }
+.w3d-chip strong { font-size: .9rem; letter-spacing: .01em; }
+.w3d-chip span { color: #f6a173; font-family: 'DM Mono', monospace; font-size: .75rem; }
+.w3d-glyph { height: 26px; overflow: visible; width: 30px; }
+.w3d-glyph-floor { stroke: rgba(255,255,255,.35); stroke-width: 2; }
+.w3d-glyph-ref { stroke: rgba(255,255,255,.25); stroke-dasharray: 2 2; stroke-width: 1.4; }
+.w3d-glyph-wall { stroke: var(--orange); stroke-linecap: round; stroke-width: 3.5; }
+.w3d-tools { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.w3d-icon { align-items: center; border-radius: 10px; color: #aab2ab; cursor: pointer; display: flex; height: 34px; justify-content: center; transition: color .2s, background .2s; width: 34px; }
+.w3d-icon:hover { color: #fff; }
+.w3d-icon.active { background: var(--orange); border-color: transparent; color: #fff; }
+.w3d-icon.active svg { animation: w3d-spin 3s linear infinite; }
+.w3d-icon svg { fill: none; height: 17px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; width: 17px; }
+.w3d-legend { border-radius: 999px; display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; padding: 4px; }
+.w3d-legend button { background: transparent; border: 0; color: #aab2ab; cursor: pointer; font-family: 'DM Mono', monospace; font-size: .72rem; }
+.w3d-icon:focus-visible, .w3d-legend button:focus-visible { outline: 2px solid var(--orange); outline-offset: 1px; }
+.w3d-legend button { align-items: center; border-radius: 999px; color: #e3e7e2; display: flex; gap: 7px; padding: 6px 11px; transition: opacity .2s, background .2s; }
+.w3d-legend button:hover { background: rgba(255,255,255,.08); }
+.w3d-legend button[aria-pressed="true"] { background: rgba(255,255,255,.16); }
+.w3d-legend button.muted { opacity: .4; }
+.w3d-legend i { border-radius: 50%; height: 8px; width: 8px; }
+.w3d-legend b { color: #8c958e; font-weight: 500; }
+.w3d-hint { color: rgba(238,241,236,.55); font-family: 'DM Mono', monospace; font-size: .68rem; margin: 0; transition: opacity .6s; }
+.w3d-hint.hidden { opacity: 0; }
+.w3d-tip { align-items: center; backdrop-filter: blur(10px); background: rgba(16,19,21,.82); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.35); color: #eef1ec; display: flex; font-family: 'DM Mono', monospace; font-size: .7rem; gap: 7px; padding: 5px 11px 5px 9px; text-transform: capitalize; transform: translateY(-50%); white-space: nowrap; }
+.w3d-tip i { border-radius: 50%; height: 8px; width: 8px; }
+.w3d-tip span { color: #9aa39c; }
+@media (max-width: 520px) { .w3d-top { flex-direction: column; } .w3d-tools { justify-content: flex-start; } }

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import './Dialog.css'
 
 // Native <dialog>: traps focus, closes on Escape, and dims the page behind it.
 // Clicking the dimmed backdrop also closes it.

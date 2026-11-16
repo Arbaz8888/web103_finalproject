@@ -4,32 +4,27 @@ import WallComponent from '../components/WallComponent'
 import HoldLegend from '../components/Hold'
 import GradeBadge from '../components/GradeBadge'
 import AngleGlyph from '../components/AngleGlyph'
-import RoleBar from '../components/RoleBar'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import ViewToggle from '../components/ViewToggle'
 import Wall3DLazy from '../components/Wall3DLazy'
 import NotFoundPage from './NotFoundPage'
-import { countRoles, grades, ROLE_COLORS } from '../data/grades'
+import { useRoute } from '../hooks/useRoute'
 import { useToast } from '../hooks/useToast'
 import { usePageTitle } from '../hooks/usePageTitle'
+import './RouteDetailsPage.css'
 
-function RouteDetailsPage({ routes, onDelete }) {
+function RouteDetailsPage({ onDelete }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
   const [view, setView] = useState('2D')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const route = routes.find((item) => item.id === Number(id))
-  usePageTitle(route?.name ?? 'Route not found')
-  if (!route) return <NotFoundPage message="That route doesn't exist, or it was deleted." />
+  const { status, route, error } = useRoute(id)
+  usePageTitle(route?.name ?? (status === 'loading' ? 'Loading route' : 'Route not found'))
 
-  const counts = countRoles(route.holds)
-  const gradeIndex = grades.indexOf(route.grade)
-  // Up to three routes within one grade of this one, closest grade first
-  const related = routes
-    .filter((item) => item.id !== route.id && Math.abs(grades.indexOf(item.grade) - gradeIndex) <= 1)
-    .sort((a, b) => Math.abs(grades.indexOf(a.grade) - gradeIndex) - Math.abs(grades.indexOf(b.grade) - gradeIndex))
-    .slice(0, 3)
+  if (status === 'loading') return <div className="skeleton skeleton-details" aria-busy="true" aria-label="Loading route" />
+  if (status === 'missing') return <NotFoundPage message="That route doesn't exist, or it was deleted." />
+  if (status === 'error') return <p className="form-error" role="alert">Could not load this route: {error}</p>
 
   async function handleDelete() {
     try {
@@ -83,16 +78,6 @@ function RouteDetailsPage({ routes, onDelete }) {
             <div><dt>Holds</dt><dd>{route.holds.length}</dd></div>
           </dl>
 
-          <div className="panel">
-            <h2 className="panel-title">Hold breakdown</h2>
-            <RoleBar holds={route.holds} />
-            <ul className="role-counts">
-              {Object.entries(counts).filter(([, count]) => count > 0).map(([role, count]) => (
-                <li key={role}><i style={{ background: ROLE_COLORS[role] }} />{role}<b>{count}</b></li>
-              ))}
-            </ul>
-          </div>
-
           <div className="details-actions">
             <Link className="button button-primary" to={`/routes/${route.id}/edit`}>✎ Edit route</Link>
             <button className="button button-ghost" onClick={handleShare} type="button">↗ Share</button>
@@ -112,27 +97,6 @@ function RouteDetailsPage({ routes, onDelete }) {
           )}
         </div>
       </div>
-
-      {related.length > 0 && (
-        <section className="related">
-          <div className="section-heading">
-            <h2>Routes at a similar grade</h2>
-            <Link className="text-link push-right" to="/">See all routes →</Link>
-          </div>
-          <div className="related-grid">
-            {related.map((item) => (
-              <Link className="related-card" to={`/routes/${item.id}`} key={item.id}>
-                <WallComponent holds={item.holds} size="sm" />
-                <div>
-                  <strong>{item.name}</strong>
-                  <span className="muted">{item.wallType} · {item.holds.length} holds</span>
-                </div>
-                <GradeBadge grade={item.grade} />
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       <ConfirmDialog
         open={confirmDelete}

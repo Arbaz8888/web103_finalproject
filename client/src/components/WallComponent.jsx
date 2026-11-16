@@ -1,15 +1,10 @@
 // Reusable 2D climbing wall: a 12 x 16 grid of T-nut bolt holes.
 // Row 0 is the top of the wall, row 15 is the floor.
 import { findOverlappingHold, getCoveredBolts, getHoldSize, HOLD_SCALE } from '../utils/holdFootprint'
+import './WallComponent.css'
 
 const ROWS = 16
 const COLS = 12
-const ROLES = ['start', 'hand', 'foot', 'finish']
-
-// Typical angle (degrees past vertical) for each wall type when a route has no exact angle.
-// Negative leans away from the climber (slab), positive leans over them (overhang/roof).
-// Matches the ranges in server/data/WallTypes.js.
-const DEFAULT_ANGLES = { slab: -10, vertical: 0, overhang: 30, roof: 70 }
 
 // Side view of the wall: floor line, dashed vertical reference, and the wall tilted to `angle`.
 // The climber stands on the right, so overhangs lean right.
@@ -43,16 +38,16 @@ function WallComponent({
   placingSize = 'medium',
   wallType,
   angle,
+  selectedCell,
   onCellClick,
   onPlacedHoldClick,
 }) {
   const holdsByCell = new Map(holds.map((hold) => [`${hold.row}-${hold.col}`, hold]))
   const coveredBolts = editable ? getCoveredBolts(holds) : new Map()
-  const profileAngle = angle ?? DEFAULT_ANGLES[wallType?.toLowerCase()]
 
   return (
     <div className={`wall-frame wall-frame-${size}`}>
-      {wallType && profileAngle !== undefined && <WallProfile wallType={wallType} angle={profileAngle} />}
+      {wallType && angle != null && <WallProfile wallType={wallType} angle={angle} />}
       <div className={`wall wall-${size}${editable ? ' wall-editable' : ''}`}>
       {Array.from({ length: ROWS * COLS }, (_, index) => {
         const row = Math.floor(index / COLS)
@@ -61,7 +56,7 @@ function WallComponent({
         const hold = holdsByCell.get(key)
 
         if (hold) {
-          const role = ROLES.includes(hold.role) ? hold.role : 'any'
+          const role = hold.role ?? 'any'
           const holdSize = getHoldSize(hold)
           const scale = { '--hold-scale': `${Math.round(HOLD_SCALE[holdSize] * 100)}%` }
           const image = (
@@ -74,11 +69,20 @@ function WallComponent({
             />
           )
           const label = `${holdSize} ${hold.role} hold at row ${row}, column ${col}`
+          const isSelected = selectedCell?.row === row && selectedCell?.col === col
 
           // The round hit area matches the hold's visible shape, so clicking anywhere on the
           // hold selects it (not the transparent corners of the PNG).
           return editable ? (
-            <button className="wall-cell" key={key} type="button" aria-label={label} onClick={() => onPlacedHoldClick?.(hold)}>
+            <button
+              className={`wall-cell${isSelected ? ' wall-cell-selected' : ''}`}
+              key={key}
+              type="button"
+              aria-label={label}
+              aria-pressed={isSelected}
+              style={scale}
+              onClick={() => onPlacedHoldClick?.(hold)}
+            >
               {image}
               <span className="wall-hold-hit" style={scale} />
             </button>

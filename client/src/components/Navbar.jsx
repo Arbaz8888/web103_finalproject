@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
+import './Navbar.css'
 
 function Navbar({ routeCount }) {
   return (

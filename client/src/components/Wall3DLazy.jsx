@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import './Wall3DLazy.css'
 
 // three.js is large, so it only downloads the first time a 3D wall is shown
 const Wall3DComponent = lazy(() => import('./Wall3DComponent'))

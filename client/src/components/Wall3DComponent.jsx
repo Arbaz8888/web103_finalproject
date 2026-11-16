@@ -8,7 +8,10 @@ import { Bloom, EffectComposer, N8AO, ToneMapping, Vignette } from '@react-three
 import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
 import { getFootprintRadius, getHoldSize, HOLD_SCALE } from '../utils/holdFootprint'
-import { getHoldColor, getHoldGeometry, getHoldType, getReadyRelief, getWallTextures, loadHoldRelief } from '../utils/hold3d'
+import { getHoldGeometry, getReadyRelief, getWallTextures, loadHoldRelief } from '../utils/hold3d'
+import { roleColor } from '../utils/display'
+import { useCatalog } from '../hooks/useCatalog'
+import './Wall3DComponent.css'
 
 const ROWS = 16
 const COLS = 12
@@ -18,25 +21,14 @@ const WALL_HEIGHT = ROWS * CELL // 8
 const THICKNESS = 0.18
 const KICKER = 0.5 // the wall starts this far off the floor so pads don't hide the bottom row
 
-// Same colors as the 2D glow and the legend dots in App.css
-const ROLES = [
-  { id: 'start', label: 'Start', color: '#eab308' },
-  { id: 'hand', label: 'Hand', color: '#3b82f6' },
-  { id: 'foot', label: 'Foot', color: '#16a34a' },
-  { id: 'finish', label: 'Finish', color: '#dc2626' },
-  { id: 'any', label: 'Any', color: '#f97316' },
-]
-const roleOf = (hold) => ROLES.find((role) => role.id === hold.role) ?? ROLES[4]
+// Role colors come from utils/display (same as the 2D glow); the role itself comes from the hold
+const roleOf = (hold) => {
+  const id = hold.role ?? 'any'
+  return { id, label: id.charAt(0).toUpperCase() + id.slice(1), color: roleColor(id) }
+}
 
 const SCENE_BG = '#14171a'
 const SHOWCASE_BG = '#0c0e10' // matches the page background so the homepage scene fades into it
-const VIEWS = [
-  { id: 'angled', label: 'Angled' },
-  { id: 'front', label: 'Front' },
-  { id: 'side', label: 'Side' },
-  { id: 'climber', label: 'Climber' },
-]
-
 // Grid cell -> point on the wall face, with the wall's center at the origin
 const toWallX = (col) => (col - 5.5) * CELL
 const toWallY = (row) => (7.5 - row) * CELL
@@ -46,29 +38,20 @@ function wallPoint(tilt, up, out = 0) {
   return [0, KICKER + up * Math.cos(tilt) - out * Math.sin(tilt), up * Math.sin(tilt) + out * Math.cos(tilt)]
 }
 
-// Camera positions for each view, worked out from the tilt so steep walls stay in frame
+// Where the camera starts (far out, for the intro glide) and where it settles, worked out
+// from the tilt so steep walls stay in frame. After that the viewer drags to look around.
 function getViews(tilt) {
   const lean = Math.sin(Math.max(tilt, 0))
   const center = wallPoint(tilt, WALL_HEIGHT / 2)
-  const atLeast = (y) => Math.max(y, 1.1)
   return {
     intro: { position: [12, center[1] + 5, center[2] + 20], target: center },
-    angled: { position: [7.5, atLeast(center[1] + 1.5 - 2.5 * lean), center[2] + 13 + 3 * lean], target: center },
-    front: { position: [0, atLeast(center[1] + 1 - 2.5 * lean), center[2] + 15.5 + 3 * lean], target: center },
-    side: { position: [16, center[1] + 1.5, center[2] + 1.5], target: center },
-    // Standing on the pads a few units off the face, looking up the line
-    climber: { position: climberPoint(tilt), target: wallPoint(tilt, WALL_HEIGHT * 0.82) },
+    home: { position: [7.5, Math.max(center[1] + 1.5 - 2.5 * lean, 1.1), center[2] + 13 + 3 * lean], target: center },
   }
-}
-
-function climberPoint(tilt) {
-  const [, y, z] = wallPoint(tilt, WALL_HEIGHT * 0.3, 4.2)
-  return [1.4, Math.max(y, 1.2), z]
 }
 
 const easeOutBack = (t) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2
 
-// Glides the camera to the chosen view. Any drag or zoom hands control back to the viewer.
+// Glides the camera to its home view. Any drag or zoom hands control back to the viewer.
 function CameraRig({ view, onInteract }) {
   const controls = useThree((state) => state.controls)
   const active = useRef(true)
@@ -186,6 +169,8 @@ function SupportPosts({ tilt }) {
 
 // How far each type of hold sticks out from the wall, as a fraction of its image width
 const RELIEF_DEPTH = { jug: 0.34, sloper: 0.26, crimp: 0.2, pinch: 0.3, pocket: 0.28 }
+const DEFAULT_RELIEF_DEPTH = 0.28
+const FALLBACK_HOLD_COLOR = '#8d939a' // only if a hold's photo fails to load
 
 // The 3D relief built from a hold's photo; undefined while it loads
 function useHoldRelief(url) {
@@ -212,8 +197,7 @@ function Hold3D({ hold, order, hovered, dimmed, onHover }) {
   const pop = useRef()
   const start = useRef(null)
   const size = getHoldSize(hold)
-  const type = getHoldType(hold)
-  const paint = getHoldColor(hold)
+  const type = hold.holdType
   const role = roleOf(hold)
   const radius = getFootprintRadius(size) * CELL
   const imageSize = HOLD_SCALE[size] * CELL
@@ -248,7 +232,7 @@ function Hold3D({ hold, order, hovered, dimmed, onHover }) {
         {relief ? (
           <mesh
             geometry={relief.geometry}
-            scale={[imageSize, imageSize, imageSize * (RELIEF_DEPTH[type] ?? 0.28)]}
+            scale={[imageSize, imageSize, imageSize * (RELIEF_DEPTH[type] ?? DEFAULT_RELIEF_DEPTH)]}
             rotation={[0, 0, rotation]}
             position={[0, 0, 0.003]}
             castShadow={!dimmed}
@@ -279,13 +263,13 @@ function Hold3D({ hold, order, hovered, dimmed, onHover }) {
             <meshPhysicalMaterial
               key={fadeKey}
               {...fade}
-              color={paint.hex}
+              color={FALLBACK_HOLD_COLOR}
               roughness={0.5}
               clearcoat={0.35}
               clearcoatRoughness={0.45}
               bumpMap={getWallTextures().grit}
               bumpScale={1.2}
-              emissive={paint.hex}
+              emissive={FALLBACK_HOLD_COLOR}
               emissiveIntensity={hovered ? 0.35 : 0}
             />
           </mesh>
@@ -302,7 +286,7 @@ function Hold3D({ hold, order, hovered, dimmed, onHover }) {
           <div className="w3d-tip" role="status">
             <i style={{ background: role.color }} />
             <strong>{role.label}</strong>
-            <span>{size} {paint.name} {type}</span>
+            <span>{size} {hold.color} {type}</span>
           </div>
         </Html>
       )}
@@ -412,7 +396,6 @@ function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, backgroun
         enabled={interactive}
         target={center}
         enablePan={false}
-        enableRotate={false}
         minDistance={2}
         maxDistance={28}
         maxPolarAngle={Math.PI * 0.9}
@@ -433,6 +416,7 @@ function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, backgroun
 }
 
 const ICONS = {
+  home: 'M4 11.5 12 5l8 6.5M6.5 10v9h11v-9',
   rotate: 'M4 12a8 8 0 0 1 13.66-5.66L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.66 5.66L4 15.3M4 20v-4.7h4.7',
   expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   collapse: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
@@ -461,7 +445,8 @@ const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion:
 function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) {
   const container = useRef()
   const [visible, setVisible] = useState(true)
-  const [viewId, setViewId] = useState({ id: 'intro', nonce: 0 })
+  const [recenter, setRecenter] = useState(0)
+  const catalog = useCatalog()
   const [focusRole, setFocusRole] = useState(null)
   const [autoRotate, setAutoRotate] = useState(() => showcase && !prefersReducedMotion())
   const [interacted, setInteracted] = useState(false)
@@ -470,12 +455,11 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
   const safeAngle = Math.max(-90, Math.min(90, angle ?? 0))
   const tilt = THREE.MathUtils.degToRad(safeAngle)
   const views = useMemo(() => getViews(tilt), [tilt])
-  // A new object on every click, so picking the same view again re-centers the camera
-  const view = useMemo(() => ({ ...views[viewId.id === 'intro' ? 'angled' : viewId.id], nonce: viewId.nonce }), [views, viewId])
+  // A new object on every "reset view" click, so the camera glides home again
+  const view = useMemo(() => ({ ...views.home, recenter }), [views, recenter])
   const name = wallType ? wallType.charAt(0).toUpperCase() + wallType.slice(1).toLowerCase() : 'Wall'
-  const counts = ROLES.map((role) => ({ ...role, count: holds.filter((hold) => roleOf(hold).id === role.id).length })).filter(
-    (role) => role.count > 0,
-  )
+  // Roles used on this wall, in the backend's order, for the highlight buttons
+  const usedRoles = (catalog?.holdRoles ?? []).filter((role) => holds.some((hold) => roleOf(hold).id === role)).map((role) => roleOf({ role }))
   const handleInteract = useCallback(() => setInteracted(true), [])
 
   useEffect(() => {
@@ -534,18 +518,15 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
           </div>
         </div>
         <div className="w3d-tools">
-          <div className="w3d-views" role="group" aria-label="Camera view">
-            {VIEWS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={viewId.id === option.id || (viewId.id === 'intro' && option.id === 'angled') ? 'active' : ''}
-                onClick={() => setViewId((current) => ({ id: option.id, nonce: current.nonce + 1 }))}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            className="w3d-icon"
+            aria-label="Reset view"
+            title="Reset view"
+            onClick={() => setRecenter((count) => count + 1)}
+          >
+            <Icon path={ICONS.home} />
+          </button>
           <button
             type="button"
             className={`w3d-icon${autoRotate ? ' active' : ''}`}
@@ -570,7 +551,7 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
 
       <div className="w3d-bottom">
         <div className="w3d-legend" role="group" aria-label="Highlight holds by role">
-          {counts.map((role) => (
+          {usedRoles.map((role) => (
             <button
               key={role.id}
               type="button"
@@ -580,11 +561,10 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
             >
               <i style={{ background: role.color, boxShadow: `0 0 8px ${role.color}` }} />
               {role.label}
-              <b>{role.count}</b>
             </button>
           ))}
         </div>
-        <p className={`w3d-hint${interacted ? ' hidden' : ''}`}>Scroll to zoom · Hover a hold</p>
+        <p className={`w3d-hint${interacted ? ' hidden' : ''}`}>Drag to rotate · Scroll to zoom · Hover a hold</p>
       </div>
       </>
       )}

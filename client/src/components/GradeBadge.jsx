@@ -1,7 +1,10 @@
-import { gradeTone } from '../data/grades'
+import { useCatalog } from '../hooks/useCatalog'
+import { gradeTone } from '../utils/display'
+import './GradeBadge.css'
 
 function GradeBadge({ grade, size = 'md' }) {
-  return <span className={`grade-badge grade-${gradeTone(grade)} grade-badge-${size}`}>{grade}</span>
+  const catalog = useCatalog()
+  return <span className={`grade-badge grade-${gradeTone(grade, catalog?.grades)} grade-badge-${size}`}>{grade}</span>
 }
 
 export default GradeBadge

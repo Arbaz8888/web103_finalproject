@@ -2,11 +2,10 @@ import { Link } from 'react-router-dom'
 import Dialog from './ui/Dialog'
 import WallComponent from './WallComponent'
 import GradeBadge from './GradeBadge'
-import RoleBar from './RoleBar'
-import { countRoles, ROLE_COLORS } from '../data/grades'
+import HoldLegend from './Hold'
+import './QuickLookModal.css'
 
 function QuickLookModal({ route, onClose }) {
-  const counts = route ? countRoles(route.holds) : {}
   return (
     <Dialog open={Boolean(route)} onClose={onClose} className="dialog-quicklook" labelledBy="quicklook-title">
       {route && (
@@ -22,12 +21,7 @@ function QuickLookModal({ route, onClose }) {
               <GradeBadge grade={route.grade} size="lg" />
             </div>
             <p className="muted">{route.wallType} wall at {route.angle}° · {route.holds.length} holds</p>
-            <RoleBar holds={route.holds} />
-            <ul className="role-counts">
-              {Object.entries(counts).filter(([, count]) => count > 0).map(([role, count]) => (
-                <li key={role}><i style={{ background: ROLE_COLORS[role] }} />{role}<b>{count}</b></li>
-              ))}
-            </ul>
+            <HoldLegend />
             <Link className="button button-primary button-block" to={`/routes/${route.id}`} onClick={onClose}>Open full route →</Link>
           </div>
         </>

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import WallComponent from './WallComponent'
 import GradeBadge from './GradeBadge'
 import AngleGlyph from './AngleGlyph'
-import RoleBar from './RoleBar'
+import './RouteCard.css'
 
 // The whole card links to the route page; the eye button opens a quick look instead.
 // Tilt the wall preview toward the mouse and move the card's light with it (mouse only)
@@ -42,7 +42,6 @@ function RouteCard({ route, onQuickLook, style }) {
           <span><AngleGlyph angle={route.angle} /> {route.wallType} · {route.angle}°</span>
           <span>{route.holds.length} holds</span>
         </div>
-        <RoleBar holds={route.holds} />
       </div>
     </article>
   )

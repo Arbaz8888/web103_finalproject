@@ -1,3 +1,5 @@
+import './ViewToggle.css'
+
 const OPTIONS = [
   { id: '2D', icon: 'M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16' },
   { id: '3D', icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5' },
