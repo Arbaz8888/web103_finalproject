@@ -1,8 +1,12 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import RouteForm from '../components/RouteForm'
+import { useToast } from '../hooks/useToast'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 function RouteBuilderPage({ routes, onSave }) {
+  usePageTitle('Build a route')
   const navigate = useNavigate()
+  const toast = useToast()
 
   function handleRandomRoute() {
     if (routes.length === 0) return
@@ -10,21 +14,29 @@ function RouteBuilderPage({ routes, onSave }) {
     navigate(`/routes/${random.id}`)
   }
 
+  async function handleSave(route) {
+    const saved = await onSave(route)
+    toast(`Saved “${saved.name}”`)
+    navigate(`/routes/${saved.id}`)
+  }
+
   return (
     <section>
-      <button className="back-link" onClick={() => navigate('/')} type="button">← Cancel</button>
-      <div className="builder-heading"><p className="eyebrow">ROUTE BUILDER</p><h1>Build a new route.</h1></div>
-      <div className="builder-options">
-        <div className="builder-option">
-          <p className="builder-option-label">Create</p>
-          <button className="button button-reset" onClick={handleRandomRoute} type="button">⟳ Random Route</button>
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/">Routes</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">New route</span>
+      </nav>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">ROUTE BUILDER</p>
+          <h1>Build a <span className="accent-text">route.</span></h1>
         </div>
-        <div className="builder-option-divider">or</div>
-        <div className="builder-option">
-          <p className="builder-option-label">Design your own</p>
-        </div>
+        <button className="button button-ghost" onClick={handleRandomRoute} disabled={routes.length === 0} type="button">
+          🎲 Open a random route
+        </button>
       </div>
-      <RouteForm onSave={async (route) => { await onSave(route); navigate('/') }} />
+      <RouteForm onSave={handleSave} submitLabel="Save route" />
     </section>
   )
 }

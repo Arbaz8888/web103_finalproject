@@ -42,7 +42,11 @@ const sendError = (res, error) => {
 	res.status(status).json({ error: error.message });
 };
 
-// Save Check: a route needs a name, grade, wall type, angle, and a start and finish hold
+export const MAX_START_HOLDS = 2;
+export const FINISH_HOLDS = 1;
+const MAX_ROTATION = 360;
+
+// Save Check: a route needs a name, grade, wall type, angle, 1-2 start holds and exactly one finish hold
 const validateRoute = ({ name, grade, wall_type_id, angle_degrees, holds } = {}) => {
 	if (!name?.trim() || !grade || !wall_type_id) {
 		return 'A route needs a name, grade, and wall type.';
@@ -53,13 +57,27 @@ const validateRoute = ({ name, grade, wall_type_id, angle_degrees, holds } = {})
 	if (!Array.isArray(holds)) {
 		return 'A route needs a holds array.';
 	}
-	if (!holds.some((hold) => hold.role === 'start')) {
-		return 'A route needs at least one start hold.';
+	const starts = holds.filter((hold) => hold.role === 'start').length;
+	const finishes = holds.filter((hold) => hold.role === 'finish').length;
+	if (starts < 1 || starts > MAX_START_HOLDS) {
+		return `A route needs 1 or ${MAX_START_HOLDS} start holds.`;
 	}
-	if (!holds.some((hold) => hold.role === 'finish')) {
-		return 'A route needs at least one finish hold.';
+	if (finishes !== FINISH_HOLDS) {
+		return 'A route needs exactly one finish hold.';
+	}
+	if (holds.some((hold) => !Number.isInteger(hold.rotation ?? 0) || hold.rotation < 0 || hold.rotation >= MAX_ROTATION)) {
+		return 'Hold rotation must be a whole number from 0 to 359 degrees.';
 	}
 	return null;
+};
+
+// The wall type must be the one whose angle range contains the route's angle
+const wallTypeMatchesAngle = async (client, wallTypeId, angle) => {
+	const results = await client.query(
+		'SELECT 1 FROM wall_types WHERE id = $1 AND $2 BETWEEN min_angle AND max_angle',
+		[wallTypeId, angle]
+	);
+	return results.rowCount > 0;
 };
 
 const insertRouteHolds = (client, routeId, holds) => {
@@ -115,6 +133,9 @@ const createRoute = async (req, res) => {
 	const client = await pool.connect();
 
 	try {
+		if (!(await wallTypeMatchesAngle(client, wall_type_id, angle_degrees))) {
+			return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
+		}
 		await client.query('BEGIN');
 		const results = await client.query(
 			'INSERT INTO climbing_routes (name, grade, angle_degrees, wall_type_id) VALUES ($1, $2, $3, $4) RETURNING id',
@@ -144,6 +165,9 @@ const updateRoute = async (req, res) => {
 	const client = await pool.connect();
 
 	try {
+		if (!(await wallTypeMatchesAngle(client, wall_type_id, angle_degrees))) {
+			return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
+		}
 		await client.query('BEGIN');
 		const results = await client.query(
 			'UPDATE climbing_routes SET name = $1, grade = $2, angle_degrees = $3, wall_type_id = $4 WHERE id = $5',

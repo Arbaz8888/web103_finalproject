@@ -1,17 +1,44 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import RouteForm from '../components/RouteForm'
+import NotFoundPage from './NotFoundPage'
+import { useRoute } from '../hooks/useRoute'
+import { useToast } from '../hooks/useToast'
+import { usePageTitle } from '../hooks/usePageTitle'
 
-function EditRoutePage({ routes, onSave }) {
+function EditRoutePage({ onSave }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const route = routes.find((item) => item.id === Number(id))
-  if (!route) return <p>That route could not be found.</p>
+  const toast = useToast()
+  const { status, route, error } = useRoute(id)
+  usePageTitle(route ? `Edit ${route.name}` : status === 'loading' ? 'Loading route' : 'Route not found')
+
+  if (status === 'loading') return <div className="skeleton skeleton-details" aria-busy="true" aria-label="Loading route" />
+  if (status === 'missing') return <NotFoundPage message="That route doesn't exist, or it was deleted." />
+  if (status === 'error') return <p className="form-error" role="alert">Could not load this route: {error}</p>
+
+  async function handleSave(updatedRoute) {
+    await onSave(updatedRoute)
+    toast('Changes saved')
+    navigate(`/routes/${route.id}`)
+  }
 
   return (
     <section>
-      <Link className="back-link" to={`/routes/${route.id}`}>← Cancel</Link>
-      <div className="builder-heading"><p className="eyebrow">EDIT ROUTE</p><h1>Tune your route.</h1></div>
-      <RouteForm existing={route} onSave={async (updatedRoute) => { await onSave(updatedRoute); navigate(`/routes/${route.id}`) }} />
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/">Routes</Link>
+        <span aria-hidden="true">/</span>
+        <Link to={`/routes/${route.id}`}>{route.name}</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Edit</span>
+      </nav>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">EDIT ROUTE</p>
+          <h1>Edit <span className="accent-text">{route.name}.</span></h1>
+        </div>
+        <Link className="button button-ghost" to={`/routes/${route.id}`}>Cancel</Link>
+      </div>
+      <RouteForm key={route.id} existing={route} onSave={handleSave} submitLabel="Save changes" />
     </section>
   )
 }

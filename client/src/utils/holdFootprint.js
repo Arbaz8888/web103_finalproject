@@ -1,7 +1,5 @@
 // Footprint math for holds on the 12 x 16 bolt grid. Distances are in bolt cells.
 
-export const SIZES = ['small', 'medium', 'large']
-
 // How big each size is drawn, as a multiple of one bolt cell. Medium is the baseline:
 // small is 50% of medium and large is 150% of medium.
 const MEDIUM_SCALE = 1.6
@@ -10,11 +8,9 @@ export const HOLD_SCALE = { small: MEDIUM_SCALE * 0.5, medium: MEDIUM_SCALE, lar
 // The hold itself fills about 85% of its square PNG; the rest is transparent padding.
 const VISIBLE_FRACTION = 0.85
 
-// Every hold PNG is the same square canvas, so it's scaled by the hold's size tag.
-// Falls back to the size in the filename (e.g. jug-green-large.png), then medium.
+// Every hold PNG is the same square canvas, so it's scaled by the hold's size from the catalog.
 export function getHoldSize(hold) {
-  if (SIZES.includes(hold.size)) return hold.size
-  return SIZES.find((size) => hold.imageUrl?.includes(size)) ?? 'medium'
+  return hold.size in HOLD_SCALE ? hold.size : 'medium'
 }
 
 // Radius of the circle a hold of this size visibly covers, in bolt cells

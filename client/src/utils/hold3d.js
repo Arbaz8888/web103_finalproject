@@ -1,47 +1,6 @@
 // Procedural 3D hold shapes and colors for Wall3DComponent.
 import * as THREE from 'three'
 
-export const HOLD_TYPES = ['jug', 'crimp', 'sloper', 'pinch', 'pocket']
-
-// Hold catalog color names -> paint colors. Keys have spaces removed so they also match
-// filenames like "pocket-brickred-large.png".
-const COLOR_HEX = {
-  black: '#26282b',
-  green: '#2f9e44',
-  pink: '#e64980',
-  yellow: '#f5c518',
-  babyblue: '#74c0fc',
-  orange: '#f76707',
-  brown: '#8a5a3b',
-  cyan: '#15aabf',
-  brickred: '#b23a2e',
-  navyblue: '#22357a',
-  purple: '#7048e8',
-  blue: '#1c7ed6',
-  red: '#e03131',
-  white: '#e9ecef',
-  gray: '#868e96',
-  grey: '#868e96',
-}
-const FALLBACK_HEX = '#9aa0a6'
-
-const fileTokens = (hold) =>
-  (hold.imageUrl ?? '').split('/').pop().replace(/\.\w+$/, '').toLowerCase().split('-')
-
-// Hold type from the API, else the first word of the image filename (e.g. "jug-green-large.png")
-export function getHoldType(hold) {
-  if (HOLD_TYPES.includes(hold.holdType)) return hold.holdType
-  return HOLD_TYPES.find((type) => fileTokens(hold)[0] === type) ?? 'sloper'
-}
-
-// Color name from the API, else a color word in the image filename
-export function getHoldColor(hold) {
-  const named = hold.color?.toLowerCase().replace(/\s+/g, '')
-  if (COLOR_HEX[named]) return { name: hold.color, hex: COLOR_HEX[named] }
-  const token = fileTokens(hold).find((word) => COLOR_HEX[word])
-  return token ? { name: token, hex: COLOR_HEX[token] } : { name: 'unpainted', hex: FALLBACK_HEX }
-}
-
 // Small seeded random generator so the same hold always gets the same shape
 function seeded(seed) {
   let value = (seed * 9301 + 49297) % 233280

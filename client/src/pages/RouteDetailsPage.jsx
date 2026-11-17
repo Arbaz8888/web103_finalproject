@@ -2,49 +2,110 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import WallComponent from '../components/WallComponent'
 import HoldLegend from '../components/Hold'
+import GradeBadge from '../components/GradeBadge'
+import AngleGlyph from '../components/AngleGlyph'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import ViewToggle from '../components/ViewToggle'
 import Wall3DLazy from '../components/Wall3DLazy'
+import NotFoundPage from './NotFoundPage'
+import { useRoute } from '../hooks/useRoute'
+import { useToast } from '../hooks/useToast'
+import { usePageTitle } from '../hooks/usePageTitle'
+import './RouteDetailsPage.css'
 
-function RouteDetailsPage({ routes, onDelete }) {
+function RouteDetailsPage({ onDelete }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [error, setError] = useState('')
+  const toast = useToast()
   const [view, setView] = useState('2D')
-  const route = routes.find((item) => item.id === Number(id))
-  if (!route) return <p>That route could not be found.</p>
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const { status, route, error } = useRoute(id)
+  usePageTitle(route?.name ?? (status === 'loading' ? 'Loading route' : 'Route not found'))
+
+  if (status === 'loading') return <div className="skeleton skeleton-details" aria-busy="true" aria-label="Loading route" />
+  if (status === 'missing') return <NotFoundPage message="That route doesn't exist, or it was deleted." />
+  if (status === 'error') return <p className="form-error" role="alert">Could not load this route: {error}</p>
 
   async function handleDelete() {
-    if (!window.confirm(`Delete “${route.name}”?`)) return
     try {
       await onDelete(route.id)
+      toast(`Deleted “${route.name}”`)
       navigate('/')
     } catch (err) {
-      setError(err.message)
+      toast(err.message, 'error')
+      setConfirmDelete(false)
+    }
+  }
+
+  async function handleShare() {
+    const url = window.location.href
+    try {
+      if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+        await navigator.share({ title: route.name, text: `Try ${route.name} (${route.grade})`, url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        toast('Link copied to clipboard')
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') toast('Could not copy the link', 'error')
     }
   }
 
   return (
-    <section>
-      <Link className="back-link" to="/">← Back to gallery</Link>
+    <section className="details">
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/">Routes</Link>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{route.name}</span>
+      </nav>
+
       <div className="details-layout">
-        <div>
-          <p className="eyebrow">{route.wallType} WALL</p>
-          <h1>{route.name}</h1>
-          <div className="details-meta"><span className="grade-badge large">{route.grade}</span><span>{route.holds.length} holds</span></div>
-          <div className="details-actions"><Link className="button button-primary" to={`/routes/${route.id}/edit`}>Edit route</Link><button className="button button-danger" onClick={handleDelete} type="button">Delete</button></div>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <p className="share-hint">Share this route: <code>{window.location.href}</code></p>
+        <div className="details-info">
+          <div className="details-title">
+            <GradeBadge grade={route.grade} size="xl" />
+            <div>
+              <p className="eyebrow">{route.wallType.toUpperCase()} WALL · {route.angle}°</p>
+              <h1>{route.name}</h1>
+            </div>
+          </div>
+
+          <dl className="stat-grid">
+            <div>
+              <dt>Wall</dt>
+              <dd><AngleGlyph angle={route.angle} className="angle-glyph-lg" />{route.wallType}</dd>
+            </div>
+            <div><dt>Angle</dt><dd>{route.angle}°</dd></div>
+            <div><dt>Holds</dt><dd>{route.holds.length}</dd></div>
+          </dl>
+
+          <div className="details-actions">
+            <Link className="button button-primary" to={`/routes/${route.id}/edit`}>✎ Edit route</Link>
+            <button className="button button-ghost" onClick={handleShare} type="button">↗ Share</button>
+            <button className="button button-danger-ghost" onClick={() => setConfirmDelete(true)} type="button">Delete</button>
+          </div>
         </div>
+
         <div className="wall-view">
           <ViewToggle view={view} onChange={setView} />
           {view === '3D' ? (
             <Wall3DLazy key={route.id} holds={route.holds} wallType={route.wallType} angle={route.angle} />
           ) : (
-            <WallComponent holds={route.holds} size="lg" wallType={route.wallType} angle={route.angle} />
+            <div className="wall-stage">
+              <WallComponent holds={route.holds} size="lg" wallType={route.wallType} angle={route.angle} />
+              <HoldLegend />
+            </div>
           )}
         </div>
       </div>
-      <HoldLegend />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete “${route.name}”?`}
+        message="The route and all its holds will be removed for everyone. This can't be undone."
+        confirmLabel="Delete route"
+        onConfirm={handleDelete}
+        onClose={() => setConfirmDelete(false)}
+      />
     </section>
   )
 }
