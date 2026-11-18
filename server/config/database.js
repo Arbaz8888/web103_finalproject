@@ -6,6 +6,7 @@ const config = {
 	host: process.env.PGHOST,
 	port: process.env.PGPORT,
 	database: process.env.PGDATABASE,
+	// Always on: the team's Postgres is hosted on Render, which requires SSL. A local Postgres must have SSL enabled.
 	ssl: {
 		rejectUnauthorized: false,
 	},
