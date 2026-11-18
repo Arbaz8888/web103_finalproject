@@ -2,7 +2,7 @@
 
 Guidance for AI coding agents working in this repo. Human-oriented explanation lives in `ARCHITECTURE.md`.
 
-> Scope: backend (`/server`), the client↔API contract, and the frontend (`/client`). The backend and API contract describe the code **after** `backend-refactor-plan.md`. The frontend is still pre-refactor (see `frontend-refactor-plan.md`).
+> Scope: backend (`/server`), the client↔API contract, and the frontend (`/client`). Both the backend and frontend describe the code **after** their respective refactor plans. Steps 8 and 10 of `frontend-refactor-plan.md` (AngleGlyph dedup + 3D split; hero idle-load + 2D fallback) are still pending.
 
 ## Project
 
@@ -60,27 +60,27 @@ Custom Climbing Route Maker: build bouldering routes on a 12 × 16 virtual wall,
 
 ## Frontend layout (`/client/src`)
 
-- `App.jsx` loads routes + `/options` + `/wall-types` once, puts options and wall types in `CatalogContext`, and owns the route list plus the `saveRoute`/`deleteRoute`/`resetRoutes` mutations. Each mutation refetches the full list.
-- `api/*.js` is the **only** place that may call `fetch`. Every call goes through `request()` in `api/routes.js`.
-- `hooks/useCatalog()` returns backend-defined lists and limits. `hooks/useRoute(id)` loads a single route for the details and edit pages.
-- `pages/` holds one component per URL. `components/RouteForm.jsx` is the builder and is shared by the new and edit pages.
-- 2D wall: `components/WallComponent.jsx` + `utils/holdFootprint.js`. 3D wall: `components/Wall3DComponent.jsx` + `utils/hold3d.js`. It's always loaded through `Wall3DLazy`.
+- `App.jsx` owns the route list via `useRouteList` and the `saveRoute`/`deleteRoute`/`resetRoutes` mutations. After each mutation the list is **updated locally** (no full refetch), except `resetRoutes`, which calls `reload()` because the full list changes.
+- `components/providers/CatalogProvider.jsx` loads options + wall types + holds in `Promise.all`. Until it succeeds it shows a full-page skeleton; on error it shows a retry screen. All pages that need catalog data live inside it.
+- `api/*.js` is the **only** place that may call `fetch`. Every call goes through `request()` in `api/client.js` (re-exported from `api/routes.js`).
+- `hooks/useCatalog()` returns backend-defined lists, limits and the hold catalog. `hooks/useRoute(id)` loads a single route for the details and edit pages.
+- `pages/` holds one component per URL. `components/builder/RouteForm.jsx` is the builder and is shared by the new and edit pages.
+- Components are grouped in subdirectories: `builder/`, `layout/`, `routes/`, `wall/`, `providers/`, `ui/`.
+- 2D wall: `components/wall/WallComponent.jsx` + `utils/holdFootprint.js`. 3D wall: `components/wall/Wall3DComponent.jsx` + `utils/hold3d.js`. It's always loaded through `Wall3DLazy`.
 - Run `npm run lint --prefix client` and `npm run build --prefix client` after any client change. There are no client tests.
 
 ## Frontend rules
 
 1. Never hardcode a value the backend defines (grades, roles, hold types/sizes, wall types and their angle ranges, hold limits). Read it from `useCatalog()`.
-2. Components use the client shape (`angle`, `row`, `col`, `wallType` capitalized). Only `api/*.js` knows the API field names.
+2. Components use the API's own field names (`angleDegrees`, `gridRow`, `gridCol`, `wallType` lowercase). `api/routes.js`'s `toApiRoute()` strips display-only fields before sending. Use `formatLabel()` from `utils/format.js` to capitalize enum values for display.
 3. Pages don't call the API for mutations. They call the `onSave`/`onDelete`/`onReset` props from `App`.
-4. Visual-only constants (colors, 3D scene numbers, animation timings) may live in the client. Keep role colors in sync between `utils/display.js` and `WallComponent.css`.
+4. Visual-only constants (colors, 3D scene numbers, animation timings) may live in the client. Role colors are defined **once** in `utils/display.js` (`ROLE_COLORS`); `WallComponent` applies them via the `--role-color` CSS variable (no `.role-*` classes).
 5. Client style: 2-space indents, no semicolons, single quotes, function components, a CSS file next to each component.
 
-## Frontend known quirks (pre-refactor)
+## Frontend known quirks
 
-- The grid size (16 × 12) is hardcoded in `WallComponent.jsx`, `WallComponent.css`, `Wall3DComponent.jsx` (including the derived `5.5`/`7.5` centering), and the gallery hero text. `/api/options` now serves it as `gridRows`/`gridCols`, but the client doesn't read it yet.
-- The hold-overlap rule (`holdFootprint.js`) exists only on the client. The server doesn't enforce it, but the starter routes follow it.
-- The client still keeps its own copies of a few rules (for example the `'hand'` default role, the 60-character name limit and the start-hold checklist labels). `/api/options` serves them now (`defaultHoldRole`, `maxNameLength`, `minStartHolds`, `maxStartHolds`).
-- The 3D chunk loads on the homepage, because the hero shows a 3D showcase.
+- The hold-overlap rule (`holdFootprint.js`) exists only on the client as a **placement aid**. The server rejects two holds on the same bolt but does not enforce footprint circles. The starter routes satisfy the client rule.
+- The 3D chunk (three.js, ~1.3 MB) loads on the homepage because the hero shows a 3D showcase.
 
 ## Conventions
 
