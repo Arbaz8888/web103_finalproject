@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import GradeFilter from '../components/GradeFilter'
-import QuickLookModal from '../components/QuickLookModal'
-import RouteGallery from '../components/RouteGallery'
+import RouteFilters from '../components/routes/RouteFilters'
+import QuickLookModal from '../components/routes/QuickLookModal'
+import RouteGallery from '../components/routes/RouteGallery'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import GradeBadge from '../components/GradeBadge'
-import GallerySkeleton from '../components/GallerySkeleton'
-import Wall3DLazy from '../components/Wall3DLazy'
+import GradeBadge from '../components/routes/GradeBadge'
+import GallerySkeleton from '../components/routes/GallerySkeleton'
+import Wall3DLazy from '../components/wall/Wall3DLazy'
 import { useCatalog } from '../hooks/useCatalog'
 import { useToast } from '../hooks/useToast'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -106,7 +106,7 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
         </button>
       </div>
 
-      <GradeFilter routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))} />
+      <RouteFilters routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))} />
 
       {status === 'loading' ? (
         <GallerySkeleton />

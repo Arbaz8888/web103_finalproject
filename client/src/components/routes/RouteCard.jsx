@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
-import WallComponent from './WallComponent'
+import WallComponent from '../wall/WallComponent'
 import GradeBadge from './GradeBadge'
-import AngleGlyph from './AngleGlyph'
+import AngleGlyph from '../wall/AngleGlyph'
 import './RouteCard.css'
 
 // The whole card links to the route page; the eye button opens a quick look instead.

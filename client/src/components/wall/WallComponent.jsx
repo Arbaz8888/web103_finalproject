@@ -1,6 +1,6 @@
 // Reusable 2D climbing wall: a 12 x 16 grid of T-nut bolt holes.
 // Row 0 is the top of the wall, row 15 is the floor.
-import { findOverlappingHold, getCoveredBolts, getHoldSize, HOLD_SCALE } from '../utils/holdFootprint'
+import { findOverlappingHold, getCoveredBolts, getHoldSize, HOLD_SCALE } from '../../utils/holdFootprint'
 import './WallComponent.css'
 
 const ROWS = 16

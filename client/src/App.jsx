@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
-import Navbar from './components/Navbar'
+import Navbar from './components/layout/Navbar'
 import ToastProvider from './components/ui/ToastProvider'
 import CatalogProvider from './components/providers/CatalogProvider'
 import * as api from './api/routes'

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { normalizeRotation } from '../api/routes'
+import { normalizeRotation } from '../../api/routes'
 import './RotationDial.css'
 
 // Knob for any rotation from 0 to 359°, plus a box to type an exact value.

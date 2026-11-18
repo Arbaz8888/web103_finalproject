@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useCatalog } from '../hooks/useCatalog'
+import { useCatalog } from '../../hooks/useCatalog'
 import './ClimbingHoldsDrawer.css'
 
 // Pick a hold from the catalog, then tap bolts on the wall to place it.

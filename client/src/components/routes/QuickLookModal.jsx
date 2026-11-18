@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
-import Dialog from './ui/Dialog'
-import WallComponent from './WallComponent'
+import Dialog from '../ui/Dialog'
+import WallComponent from '../wall/WallComponent'
 import GradeBadge from './GradeBadge'
-import HoldLegend from './Hold'
+import HoldLegend from '../wall/HoldLegend'
 import './QuickLookModal.css'
 
 function QuickLookModal({ route, onClose }) {

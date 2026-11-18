@@ -1,5 +1,5 @@
-import { useCatalog } from '../hooks/useCatalog'
-import './GradeFilter.css'
+import { useCatalog } from '../../hooks/useCatalog'
+import './RouteFilters.css'
 
 const SORTS = [
   { id: 'newest', label: 'Newest' },
@@ -8,7 +8,7 @@ const SORTS = [
 ]
 
 // Search, grade chips, wall type chips and sort for the gallery
-function GradeFilter({ routes, filters, onChange, onClear }) {
+function RouteFilters({ routes, filters, onChange, onClear }) {
   const { query, grade, wallType, sort } = filters
   const { grades, wallTypes: allWallTypes } = useCatalog()
   const gradeCounts = Object.fromEntries(grades.map((item) => [item, routes.filter((route) => route.grade === item).length]))
@@ -76,4 +76,4 @@ function GradeFilter({ routes, filters, onChange, onClear }) {
   )
 }
 
-export default GradeFilter
+export default RouteFilters

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import RouteForm from '../components/RouteForm'
+import RouteForm from '../components/builder/RouteForm'
 import NotFoundPage from './NotFoundPage'
 import { useRoute } from '../hooks/useRoute'
 import { useToast } from '../hooks/useToast'

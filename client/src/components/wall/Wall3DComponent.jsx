@@ -7,10 +7,10 @@ import { Environment, Html, Lightformer, OrbitControls, RoundedBox } from '@reac
 import { Bloom, EffectComposer, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
-import { getFootprintRadius, getHoldSize, HOLD_SCALE } from '../utils/holdFootprint'
-import { getHoldGeometry, getReadyRelief, getWallTextures, loadHoldRelief } from '../utils/hold3d'
-import { roleColor } from '../utils/display'
-import { useCatalog } from '../hooks/useCatalog'
+import { getFootprintRadius, getHoldSize, HOLD_SCALE } from '../../utils/holdFootprint'
+import { getHoldGeometry, getReadyRelief, getWallTextures, loadHoldRelief } from '../../utils/hold3d'
+import { roleColor } from '../../utils/display'
+import { useCatalog } from '../../hooks/useCatalog'
 import './Wall3DComponent.css'
 
 const ROWS = 16

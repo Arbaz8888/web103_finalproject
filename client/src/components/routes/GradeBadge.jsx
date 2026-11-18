@@ -1,5 +1,5 @@
-import { useCatalog } from '../hooks/useCatalog'
-import { gradeTone } from '../utils/display'
+import { useCatalog } from '../../hooks/useCatalog'
+import { gradeTone } from '../../utils/display'
 import './GradeBadge.css'
 
 function GradeBadge({ grade, size = 'md' }) {
