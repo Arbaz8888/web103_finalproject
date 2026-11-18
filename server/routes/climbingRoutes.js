@@ -19,7 +19,6 @@ router.get('/', ClimbingRoutesController.getRoutes);
 router.get('/:id', ClimbingRoutesController.getRouteById);
 router.post('/', ClimbingRoutesController.createRoute);
 router.put('/:id', ClimbingRoutesController.updateRoute);
-router.patch('/:id', ClimbingRoutesController.updateRoute);
 router.delete('/:id', ClimbingRoutesController.deleteRoute);
 
 export default router;

@@ -69,7 +69,7 @@ export const createRoute = async (route) =>
   toClientRoute(await request('/routes', { method: 'POST', body: JSON.stringify(toApiRoute(route)) }))
 
 export const updateRoute = async (route) =>
-  toClientRoute(await request(`/routes/${route.id}`, { method: 'PATCH', body: JSON.stringify(toApiRoute(route)) }))
+  toClientRoute(await request(`/routes/${route.id}`, { method: 'PUT', body: JSON.stringify(toApiRoute(route)) }))
 
 export const deleteRoute = (id) => request(`/routes/${id}`, { method: 'DELETE' })
 
