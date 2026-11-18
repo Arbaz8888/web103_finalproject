@@ -1,5 +1,5 @@
 import { pool } from '../config/database.js';
-import { FINISH_HOLDS, MAX_START_HOLDS } from './climbingRoutes.js';
+import { FINISH_HOLDS, MAX_START_HOLDS } from '../config/rules.js';
 
 // The allowed values for grades and hold fields come straight from the database enums
 // (see config/reset.js), and the hold limits come from the same rules the save check uses,

@@ -1,5 +1,6 @@
 import { pool } from '../config/database.js';
 import { seedAllTables } from '../config/reset.js';
+import { FINISH_HOLDS, MAX_ROTATION, MAX_START_HOLDS, MIN_START_HOLDS } from '../config/rules.js';
 
 // Each route comes back with its wall type and an array of its placed holds
 const SELECT_ROUTES = `
@@ -42,10 +43,6 @@ const sendError = (res, error) => {
 	res.status(status).json({ error: error.message });
 };
 
-export const MAX_START_HOLDS = 2;
-export const FINISH_HOLDS = 1;
-const MAX_ROTATION = 360;
-
 // Save Check: a route needs a name, grade, wall type, angle, 1-2 start holds and exactly one finish hold
 const validateRoute = ({ name, grade, wall_type_id, angle_degrees, holds } = {}) => {
 	if (!name?.trim() || !grade || !wall_type_id) {
@@ -59,13 +56,13 @@ const validateRoute = ({ name, grade, wall_type_id, angle_degrees, holds } = {})
 	}
 	const starts = holds.filter((hold) => hold.role === 'start').length;
 	const finishes = holds.filter((hold) => hold.role === 'finish').length;
-	if (starts < 1 || starts > MAX_START_HOLDS) {
+	if (starts < MIN_START_HOLDS || starts > MAX_START_HOLDS) {
 		return `A route needs 1 or ${MAX_START_HOLDS} start holds.`;
 	}
 	if (finishes !== FINISH_HOLDS) {
 		return 'A route needs exactly one finish hold.';
 	}
-	if (holds.some((hold) => !Number.isInteger(hold.rotation ?? 0) || hold.rotation < 0 || hold.rotation >= MAX_ROTATION)) {
+	if (holds.some((hold) => !Number.isInteger(hold.rotation ?? 0) || hold.rotation < 0 || hold.rotation > MAX_ROTATION)) {
 		return 'Hold rotation must be a whole number from 0 to 359 degrees.';
 	}
 	return null;
