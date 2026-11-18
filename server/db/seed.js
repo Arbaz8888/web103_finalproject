@@ -31,6 +31,9 @@ export const seedReferenceData = async (client) => {
 };
 
 export const seedStarterRoutes = async (client) => {
+	// Clears every route (and its holds) so only the starter routes remain
+	await client.query('TRUNCATE route_holds, climbing_routes RESTART IDENTITY');
+
 	for (const route of StartingRoutes) {
 		await client.query(
 			'INSERT INTO climbing_routes (id, name, grade, angle_degrees, wall_type_id, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
