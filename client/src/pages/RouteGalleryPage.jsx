@@ -7,7 +7,7 @@ import RouteGallery from '../components/routes/RouteGallery'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import GradeBadge from '../components/routes/GradeBadge'
 import GallerySkeleton from '../components/routes/GallerySkeleton'
-import Wall3DLazy from '../components/wall/Wall3DLazy'
+import HeroWall from '../components/wall/HeroWall'
 import { useCatalog } from '../hooks/useCatalog'
 import { useToast } from '../hooks/useToast'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -86,7 +86,7 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
         <div className="hero-stage">
           {featured ? (
             <>
-              <Wall3DLazy key={featured.id} holds={featured.holds} angle={featured.angleDegrees} wallType={featured.wallType} showcase fallbackClassName="wall-3d-showcase" />
+              <HeroWall route={featured} />
               <Link className="featured-chip" to={`/routes/${featured.id}`}>
                 <span className="featured-label">Featured route</span>
                 <strong>{featured.name}</strong>

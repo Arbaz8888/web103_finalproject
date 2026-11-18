@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import { useCatalog } from '../../hooks/useCatalog'
 import './Wall3DLazy.css'
 
-// three.js is large, so it only downloads the first time a 3D wall is shown
+// three.js is large, so it downloads the first time a 3D wall renders: the details/builder 3D toggle, or the homepage hero once the page is idle.
 const Wall3DComponent = lazy(() => import('./three/Wall3DComponent'))
 
 function Wall3DLazy({ fallbackClassName = '', ...props }) {

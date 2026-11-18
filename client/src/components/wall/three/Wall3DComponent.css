@@ -214,3 +214,15 @@
     justify-content: flex-start;
   }
 }
+
+.wall-3d.wall-3d-showcase:not(.wall-3d-loading) {
+  animation: wall-3d-fade-in 600ms ease-out both;
+}
+@keyframes wall-3d-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

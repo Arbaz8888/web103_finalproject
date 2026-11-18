@@ -2,7 +2,7 @@
 
 This document explains how Custom Climbing Route Maker is put together. It's for teammates (and future us) who need to find their way around the code.
 
-> **Scope:** Sections 1–7 cover the **backend** (`/server`) and the API contract. Sections 8–13 cover the **frontend** (`/client`). Both the backend and frontend describe the code **after** their respective refactor plans. Steps 8 and 10 of `frontend-refactor-plan.md` (AngleGlyph dedup + 3D component split; hero idle-load + 2D fallback for reduced motion) are still pending.
+> **Scope:** Sections 1–7 cover the **backend** (`/server`) and the API contract. Sections 8–13 cover the **frontend** (`/client`). Both the backend and frontend describe the code **after** their respective refactor plans.
 
 ---
 
@@ -326,7 +326,9 @@ client/src/
 │   │   ├── WallComponent + WallComponent.css  2D bolt grid
 │   │   ├── HoldLegend + HoldLegend.css        Role color key
 │   │   ├── Wall3DLazy + Wall3DLazy.css        Lazy wrapper + showcase styles
-│   │   ├── Wall3DComponent                    3D gym scene
+│   │   ├── HeroWall                           Homepage hero: idle-loaded 3D, 2D fallback
+│   │   ├── three/                             3D wall: Wall3DComponent (entry), Scene, WallBoard,
+│   │   │                                      Hold3D, CameraRig, sceneLayout.js, hold3d.js
 │   │   ├── AngleGlyph                         Angle diagram SVG
 │   │   └── ViewToggle                         2D / 3D segmented control
 │   ├── providers/
@@ -335,11 +337,11 @@ client/src/
 │       ├── Dialog, ConfirmDialog  Native <dialog> wrappers
 │       └── ToastProvider          Toast stack
 ├── utils/
-│   ├── display.js           ROLE_COLORS, roleColor(), gradeTone()
+│   ├── display.js           ROLE_COLORS, roleColor(), describeRole(), gradeTone()
 │   ├── format.js            formatLabel() — capitalize a backend enum value for display
 │   ├── rotation.js          normalizeRotation(degrees, maxRotation)
 │   ├── holdFootprint.js     Hold scale, footprint radius, covered/overlapping bolts
-│   └── hold3d.js            Procedural geometry and canvas textures for 3D holds
+│   └── webgl.js             supportsWebGL()
 └── styles/
     ├── base.css              Shared layout, type, buttons, .wall-stage
     ├── theme.css             Design tokens (CSS custom properties)
@@ -356,7 +358,7 @@ App  (useRouteList: status, routes[], reload, setRoutes)
         └── CatalogProvider  (options + wallTypes + holds → CatalogContext)
             ├── RouteGalleryPage  props: routes, status, error, onRetry, onReset
             │                     state: filters, previewRoute, confirmReset
-            │   ├── Wall3DLazy (showcase of the route with the most holds)
+            │   ├── HeroWall (route with the most holds: 3D when idle, else 2D)
             │   ├── RouteFilters → RouteGallery → RouteCard → WallComponent (sm)
             │   ├── QuickLookModal → Dialog → WallComponent
             │   └── ConfirmDialog (reset)
@@ -401,7 +403,7 @@ Display-only mappings on the client:
 - **Role colors:** `ROLE_COLORS` in `utils/display.js`. `WallComponent` applies them via the `--role-color` CSS variable on each `.wall-hold` element (glow `drop-shadow`). `HoldLegend` reads them through `roleColor()`. No `.role-*` CSS classes.
 - **Grade tones:** `gradeTone()` splits the backend's grade list into easy/moderate/hard/elite by position.
 - **Hold size → drawn scale:** `HOLD_SCALE` in `utils/holdFootprint.js` (small 0.8, medium 1.6, large 2.4 bolt cells).
-- **3D relief depth per hold type:** `RELIEF_DEPTH` in `Wall3DComponent.jsx`.
+- **3D relief depth per hold type:** `RELIEF_DEPTH` in `three/Hold3D.jsx`.
 - **Rotation normalization:** `normalizeRotation(degrees, maxRotation)` in `utils/rotation.js`; `maxRotation` comes from the catalog.
 
 ## 12. The 2D wall and placement rules

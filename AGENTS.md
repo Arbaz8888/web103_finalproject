@@ -2,7 +2,7 @@
 
 Guidance for AI coding agents working in this repo. Human-oriented explanation lives in `ARCHITECTURE.md`.
 
-> Scope: backend (`/server`), the client↔API contract, and the frontend (`/client`). Both the backend and frontend describe the code **after** their respective refactor plans. Steps 8 and 10 of `frontend-refactor-plan.md` (AngleGlyph dedup + 3D split; hero idle-load + 2D fallback) are still pending.
+> Scope: backend (`/server`), the client↔API contract, and the frontend (`/client`). Both the backend and frontend describe the code **after** their respective refactor plans.
 
 ## Project
 
@@ -66,7 +66,7 @@ Custom Climbing Route Maker: build bouldering routes on a 12 × 16 virtual wall,
 - `hooks/useCatalog()` returns backend-defined lists, limits and the hold catalog. `hooks/useRoute(id)` loads a single route for the details and edit pages.
 - `pages/` holds one component per URL. `components/builder/RouteForm.jsx` is the builder and is shared by the new and edit pages.
 - Components are grouped in subdirectories: `builder/`, `layout/`, `routes/`, `wall/`, `providers/`, `ui/`.
-- 2D wall: `components/wall/WallComponent.jsx` + `utils/holdFootprint.js`. 3D wall: `components/wall/Wall3DComponent.jsx` + `utils/hold3d.js`. It's always loaded through `Wall3DLazy`.
+- 2D wall: `components/wall/WallComponent.jsx` + `utils/holdFootprint.js`. 3D wall: `components/wall/three/` (`Wall3DComponent.jsx` is the entry; `Scene`, `WallBoard`, `Hold3D`, `CameraRig`, `sceneLayout.js` and `hold3d.js` sit beside it). It's always loaded through `Wall3DLazy`. `AngleGlyph` is the only angle sketch (used by cards, the 2D wall profile and the 3D chip).
 - Run `npm run lint --prefix client` and `npm run build --prefix client` after any client change. There are no client tests.
 
 ## Frontend rules
@@ -80,7 +80,7 @@ Custom Climbing Route Maker: build bouldering routes on a 12 × 16 virtual wall,
 ## Frontend known quirks
 
 - The hold-overlap rule (`holdFootprint.js`) exists only on the client as a **placement aid**. The server rejects two holds on the same bolt but does not enforce footprint circles. The starter routes satisfy the client rule.
-- The 3D chunk (three.js, ~1.3 MB) loads on the homepage because the hero shows a 3D showcase.
+- The 3D chunk (three.js, ~1.3 MB) loads on the homepage only once the browser is idle: `HeroWall` shows a placeholder, then the 3D showcase. Reduced motion, data saver or no WebGL get the 2D wall and never load the chunk.
 
 ## Conventions
 
