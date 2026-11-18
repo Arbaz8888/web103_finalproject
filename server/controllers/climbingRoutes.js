@@ -78,10 +78,10 @@ const validateRoute = ({ name, grade, angleDegrees, holds } = {}) => {
 	const starts = holds.filter((hold) => hold.role === 'start').length;
 	const finishes = holds.filter((hold) => hold.role === 'finish').length;
 	if (starts < MIN_START_HOLDS || starts > MAX_START_HOLDS) {
-		return `A route needs 1 or ${MAX_START_HOLDS} start holds.`;
+		return `A route needs between ${MIN_START_HOLDS} and ${MAX_START_HOLDS} start holds.`;
 	}
 	if (finishes !== FINISH_HOLDS) {
-		return 'A route needs exactly one finish hold.';
+		return `A route needs exactly ${FINISH_HOLDS} finish hold.`;
 	}
 	if (holds.some((hold) => !Number.isInteger(hold.rotation) || hold.rotation < 0 || hold.rotation > MAX_ROTATION)) {
 		return 'Hold rotation must be a whole number from 0 to 359 degrees.';
