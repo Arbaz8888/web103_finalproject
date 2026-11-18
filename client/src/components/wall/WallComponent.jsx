@@ -1,11 +1,10 @@
 // Reusable 2D climbing wall: a grid of T-nut bolt holes (dimensions from the catalog).
 // Row 0 is the top of the wall.
 import { findOverlappingHold, getCoveredBolts, getHoldSize, HOLD_SCALE } from '../../utils/holdFootprint'
+import { roleColor } from '../../utils/display'
 import { formatLabel } from '../../utils/format'
+import { useCatalog } from '../../hooks/useCatalog'
 import './WallComponent.css'
-
-const ROWS = 16
-const COLS = 12
 
 // Side view of the wall: floor line, dashed vertical reference, and the wall tilted to `angle`.
 // The climber stands on the right, so overhangs lean right.
@@ -43,30 +42,33 @@ function WallComponent({
   onCellClick,
   onPlacedHoldClick,
 }) {
+  const { gridRows, gridCols } = useCatalog()
   const holdsByCell = new Map(holds.map((hold) => [`${hold.gridRow}-${hold.gridCol}`, hold]))
   const coveredBolts = editable ? getCoveredBolts(holds) : new Map()
 
   return (
     <div className={`wall-frame wall-frame-${size}`}>
       {wallType && angle != null && <WallProfile wallType={wallType} angle={angle} />}
-      <div className={`wall wall-${size}${editable ? ' wall-editable' : ''}`}>
-      {Array.from({ length: ROWS * COLS }, (_, index) => {
-        const row = Math.floor(index / COLS)
-        const col = index % COLS
+      <div
+        className={`wall wall-${size}${editable ? ' wall-editable' : ''}`}
+        style={{ '--grid-rows': gridRows, '--grid-cols': gridCols }}
+      >
+      {Array.from({ length: gridRows * gridCols }, (_, index) => {
+        const row = Math.floor(index / gridCols)
+        const col = index % gridCols
         const key = `${row}-${col}`
         const hold = holdsByCell.get(key)
 
         if (hold) {
-          const role = hold.role ?? 'any'
           const holdSize = getHoldSize(hold)
           const scale = { '--hold-scale': `${Math.round(HOLD_SCALE[holdSize] * 100)}%` }
           const image = (
             <img
-              className={`wall-hold role-${role}`}
+              className="wall-hold"
               src={hold.imageUrl}
               alt=""
               draggable={false}
-              style={{ ...scale, transform: `rotate(${hold.rotation ?? 0}deg)` }}
+              style={{ ...scale, transform: `rotate(${hold.rotation ?? 0}deg)`, '--role-color': roleColor(hold.role) }}
             />
           )
           const label = `${holdSize} ${hold.role} hold at row ${row}, column ${col}`

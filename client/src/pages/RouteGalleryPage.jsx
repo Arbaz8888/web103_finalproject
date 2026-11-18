@@ -17,7 +17,7 @@ const EMPTY_FILTERS = { query: '', grade: '', wallType: '', sort: 'newest' }
 function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
   usePageTitle('Route gallery')
   const toast = useToast()
-  const { grades } = useCatalog()
+  const { grades, gridRows, gridCols } = useCatalog()
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [previewRoute, setPreviewRoute] = useState(null)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -67,7 +67,7 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
         <div className="hero-copy">
           <p className="eyebrow">BOULDERING ROUTE BUILDER</p>
           <h1>Build bouldering routes on a <span className="accent-text">virtual wall.</span></h1>
-          <p className="lede">Pick holds, place them on a 12 × 16 bolt grid, mark the start and finish, and set the wall angle. Sketch a route here before you set it on a real wall.</p>
+          <p className="lede">Pick holds, place them on a {gridCols} × {gridRows} bolt grid, mark the start and finish, and set the wall angle. Sketch a route here before you set it on a real wall.</p>
           <div className="hero-actions">
             <Link className="button button-primary button-lg" to="/routes/new">＋ Build a route</Link>
             <a className="button button-ghost button-lg" href="#routes">See saved routes ↓</a>

@@ -1,6 +1,6 @@
-// 3D view of a climbing wall. Same 12 x 16 bolt grid as WallComponent, built as a
-// 6 x 8 unit board (0.5 units per bolt), tilted to the route's wall angle and set in a
-// small gym scene: kicker, crash pads, back framing, soft lighting and glowing role rings.
+// 3D view of a climbing wall. Grid dimensions come from the catalog.
+// Built as a (cols * CELL) × (rows * CELL) unit board, tilted to the route's wall angle and set
+// in a small gym scene: kicker, crash pads, back framing, soft lighting and glowing role rings.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Html, Lightformer, OrbitControls, RoundedBox } from '@react-three/drei'
@@ -13,25 +13,27 @@ import { roleColor } from '../../utils/display'
 import { useCatalog } from '../../hooks/useCatalog'
 import './Wall3DComponent.css'
 
-const ROWS = 16
-const COLS = 12
 const CELL = 0.5
-const WALL_WIDTH = COLS * CELL // 6
-const WALL_HEIGHT = ROWS * CELL // 8
 const THICKNESS = 0.18
 const KICKER = 0.5 // the wall starts this far off the floor so pads don't hide the bottom row
 
 // Role colors come from utils/display (same as the 2D glow); the role itself comes from the hold
 const roleOf = (hold) => {
-  const id = hold.role ?? 'any'
+  const id = hold.role
   return { id, label: id.charAt(0).toUpperCase() + id.slice(1), color: roleColor(id) }
 }
 
 const SCENE_BG = '#14171a'
 const SHOWCASE_BG = '#0c0e10' // matches the page background so the homepage scene fades into it
+
 // Grid cell -> point on the wall face, with the wall's center at the origin
-const toWallX = (col) => (col - 5.5) * CELL
-const toWallY = (row) => (7.5 - row) * CELL
+function makeLayout(rows, cols) {
+  const width = cols * CELL
+  const height = rows * CELL
+  const toWallX = (col) => (col - (cols - 1) / 2) * CELL
+  const toWallY = (row) => ((rows - 1) / 2 - row) * CELL
+  return { width, height, toWallX, toWallY }
+}
 
 // A point on the wall face (height up the wall, distance out from it) in world space
 function wallPoint(tilt, up, out = 0) {
@@ -40,9 +42,9 @@ function wallPoint(tilt, up, out = 0) {
 
 // Where the camera starts (far out, for the intro glide) and where it settles, worked out
 // from the tilt so steep walls stay in frame. After that the viewer drags to look around.
-function getViews(tilt) {
+function getViews(tilt, height) {
   const lean = Math.sin(Math.max(tilt, 0))
-  const center = wallPoint(tilt, WALL_HEIGHT / 2)
+  const center = wallPoint(tilt, height / 2)
   return {
     intro: { position: [12, center[1] + 5, center[2] + 20], target: center },
     home: { position: [7.5, Math.max(center[1] + 1.5 - 2.5 * lean, 1.1), center[2] + 13 + 3 * lean], target: center },
@@ -90,19 +92,20 @@ function CameraRig({ view, onInteract }) {
 }
 
 // Every bolt hole, drawn as one instanced mesh
-function Bolts() {
+function Bolts({ rows, cols, toWallX, toWallY }) {
   const mesh = useMemo(() => {
     const geometry = new THREE.CircleGeometry(0.022, 16)
     const material = new THREE.MeshStandardMaterial({ color: '#3a362f', roughness: 0.5, metalness: 0.4 })
-    const instanced = new THREE.InstancedMesh(geometry, material, ROWS * COLS)
+    const instanced = new THREE.InstancedMesh(geometry, material, rows * cols)
     const matrix = new THREE.Matrix4()
-    for (let i = 0; i < ROWS * COLS; i++) {
-      matrix.setPosition(toWallX(i % COLS), toWallY(Math.floor(i / COLS)), 0.002)
+    for (let i = 0; i < rows * cols; i++) {
+      matrix.setPosition(toWallX(i % cols), toWallY(Math.floor(i / cols)), 0.002)
       instanced.setMatrixAt(i, matrix)
     }
     instanced.receiveShadow = true
     return instanced
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, cols])
 
   useEffect(() => () => {
     mesh.geometry.dispose()
@@ -113,7 +116,7 @@ function Bolts() {
 }
 
 // The plywood board: textured paint on the face, veneer layers on the edges, framing behind
-function WallBoard() {
+function WallBoard({ width, height, toWallX, toWallY, rows, cols }) {
   const materials = useMemo(() => {
     const { face, edge } = getWallTextures()
     const edgeAcross = edge.clone()
@@ -126,28 +129,28 @@ function WallBoard() {
     return [side, side, topBottom, topBottom, front, back]
   }, [])
 
-  const studs = [-2.95, -1, 1, 2.95]
-  const rails = [-WALL_HEIGHT / 2 + 0.05, 0, WALL_HEIGHT / 2 - 0.05]
+  const studs = [-(width / 2 - 0.05), -width / 6, width / 6, width / 2 - 0.05]
+  const rails = [-height / 2 + 0.05, 0, height / 2 - 0.05]
   const frameZ = -THICKNESS - 0.14
 
   return (
     <group>
       <mesh position={[0, 0, -THICKNESS / 2]} material={materials} castShadow receiveShadow>
-        <boxGeometry args={[WALL_WIDTH, WALL_HEIGHT, THICKNESS]} />
+        <boxGeometry args={[width, height, THICKNESS]} />
       </mesh>
       {studs.map((x) => (
         <mesh key={`stud${x}`} position={[x, 0, frameZ]} castShadow>
-          <boxGeometry args={[0.09, WALL_HEIGHT, 0.28]} />
+          <boxGeometry args={[0.09, height, 0.28]} />
           <meshStandardMaterial color="#c49a63" roughness={0.85} />
         </mesh>
       ))}
       {rails.map((y) => (
         <mesh key={`rail${y}`} position={[0, y, frameZ]} castShadow>
-          <boxGeometry args={[WALL_WIDTH - 0.1, 0.09, 0.28]} />
+          <boxGeometry args={[width - 0.1, 0.09, 0.28]} />
           <meshStandardMaterial color="#c49a63" roughness={0.85} />
         </mesh>
       ))}
-      <Bolts />
+      <Bolts rows={rows} cols={cols} toWallX={toWallX} toWallY={toWallY} />
     </group>
   )
 }
@@ -155,11 +158,12 @@ function WallBoard() {
 // Steel posts at the top back corners. A slab is propped up from the floor behind it;
 // an overhang or roof hangs from the ceiling, so its posts run up out of frame.
 const CEILING = 16
-function SupportPosts({ tilt }) {
+function SupportPosts({ tilt, width, height }) {
   if (Math.abs(tilt) < 0.03) return null
-  const [, topY, topZ] = wallPoint(tilt, WALL_HEIGHT - 0.1, -(THICKNESS + 0.21))
+  const [, topY, topZ] = wallPoint(tilt, height - 0.1, -(THICKNESS + 0.21))
   const [bottom, top] = tilt < 0 ? [0, topY] : [topY, CEILING]
-  return [-2.8, 2.8].map((x) => (
+  const postX = width / 2 - 0.2
+  return [-postX, postX].map((x) => (
     <mesh key={x} position={[x, (bottom + top) / 2, topZ]} castShadow>
       <boxGeometry args={[0.14, top - bottom, 0.14]} />
       <meshStandardMaterial color="#3a3f45" roughness={0.6} metalness={0.5} />
@@ -193,7 +197,7 @@ function useHoldRelief(url) {
 
 // One hold: its own photo raised into 3D, with a glowing ring for its role.
 // Falls back to a generated shape in the hold's color if the photo can't load.
-function Hold3D({ hold, order, hovered, dimmed, onHover }) {
+function Hold3D({ hold, order, hovered, dimmed, onHover, toWallX, toWallY }) {
   const pop = useRef()
   const start = useRef(null)
   const size = getHoldSize(hold)
@@ -294,12 +298,13 @@ function Hold3D({ hold, order, hovered, dimmed, onHover }) {
   )
 }
 
-function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, background = SCENE_BG, interactive = true, lite = false }) {
+function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, background = SCENE_BG, interactive = true, lite = false, layout }) {
+  const { width, height, toWallX, toWallY, rows, cols } = layout
   const tiltGroup = useRef()
   const [hovered, setHovered] = useState(null)
   const lean = Math.sin(Math.max(tilt, 0))
   const padDepth = 3 + 7 * lean
-  const center = wallPoint(tilt, WALL_HEIGHT / 2)
+  const center = wallPoint(tilt, height / 2)
 
   // Bottom holds appear first, like a climber reading the route from the ground
   const order = useMemo(() => {
@@ -365,16 +370,16 @@ function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, backgroun
 
       {/* Kicker panel under the wall */}
       <mesh position={[0, KICKER / 2, -THICKNESS / 2]} castShadow receiveShadow>
-        <boxGeometry args={[WALL_WIDTH, KICKER, THICKNESS]} />
+        <boxGeometry args={[width, KICKER, THICKNESS]} />
         <meshStandardMaterial color="#3b3f44" roughness={0.8} />
       </mesh>
 
-      <SupportPosts tilt={tilt} />
+      <SupportPosts tilt={tilt} width={width} height={height} />
 
       {/* Tilted around the X axis at the wall's bottom edge: positive leans toward the climber */}
       <group ref={tiltGroup} position={[0, KICKER, 0]}>
-        <group position={[0, WALL_HEIGHT / 2, 0]}>
-          <WallBoard />
+        <group position={[0, height / 2, 0]}>
+          <WallBoard width={width} height={height} toWallX={toWallX} toWallY={toWallY} rows={rows} cols={cols} />
           {holds.map((hold) => {
             const key = `${hold.gridRow}-${hold.gridCol}`
             return (
@@ -385,6 +390,8 @@ function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, backgroun
                 hovered={hovered === key}
                 dimmed={Boolean(focusRole) && roleOf(hold).id !== focusRole}
                 onHover={(target) => setHovered(target ? `${target.gridRow}-${target.gridCol}` : null)}
+                toWallX={toWallX}
+                toWallY={toWallY}
               />
             )
           })}
@@ -446,7 +453,7 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
   const container = useRef()
   const [visible, setVisible] = useState(true)
   const [recenter, setRecenter] = useState(0)
-  const { holdRoles } = useCatalog()
+  const { holdRoles, gridRows, gridCols } = useCatalog()
   const [focusRole, setFocusRole] = useState(null)
   const [autoRotate, setAutoRotate] = useState(() => showcase && !prefersReducedMotion())
   const [interacted, setInteracted] = useState(false)
@@ -454,7 +461,9 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
 
   const safeAngle = Math.max(-90, Math.min(90, angle ?? 0))
   const tilt = THREE.MathUtils.degToRad(safeAngle)
-  const views = useMemo(() => getViews(tilt), [tilt])
+  // Derive layout from catalog so the 3D scene matches the 2D grid
+  const layout = useMemo(() => ({ ...makeLayout(gridRows, gridCols), rows: gridRows, cols: gridCols }), [gridRows, gridCols])
+  const views = useMemo(() => getViews(tilt, layout.height), [tilt, layout.height])
   // A new object on every "reset view" click, so the camera glides home again
   const view = useMemo(() => ({ ...views.home, recenter }), [views, recenter])
   const name = wallType ? wallType.charAt(0).toUpperCase() + wallType.slice(1).toLowerCase() : 'Wall'
@@ -483,7 +492,11 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
   }
 
   return (
-    <div className={`wall-3d${showcase ? ' wall-3d-showcase' : ''}`} ref={container}>
+    <div
+      className={`wall-3d${showcase ? ' wall-3d-showcase' : ''}`}
+      ref={container}
+      style={{ '--grid-cols': gridCols, '--grid-rows': gridRows }}
+    >
       <Canvas
         frameloop={visible ? 'always' : 'never'}
         shadows
@@ -503,6 +516,7 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
           background={showcase ? SHOWCASE_BG : SCENE_BG}
           interactive={!showcase}
           lite={showcase}
+          layout={layout}
         />
       </Canvas>
 

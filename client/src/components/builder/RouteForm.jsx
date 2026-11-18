@@ -12,13 +12,12 @@ import { formatLabel } from '../../utils/format'
 import { gradeTone, roleColor } from '../../utils/display'
 import './RouteForm.css'
 
-const DEFAULT_ROLE = 'hand'
 const HISTORY_LIMIT = 50
 const isTyping = (target) => ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable
 const sameSpot = (a, b) => a && b && a.gridRow === b.gridRow && a.gridCol === b.gridCol
 
 function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
-  const { grades, holdRoles, wallTypes, maxStartHolds, finishHolds } = useCatalog()
+  const { grades, holdRoles, wallTypes, minStartHolds, maxStartHolds, finishHolds, maxNameLength, defaultHoldRole, maxRotation } = useCatalog()
   const [name, setName] = useState(existing?.name ?? '')
   const [grade, setGrade] = useState(existing?.grade ?? grades[0])
   const [angleDegrees, setAngleDegrees] = useState(existing?.angleDegrees ?? 0)
@@ -43,8 +42,8 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
 
   const checks = [
     { id: 'name', label: 'Route name', done: Boolean(name.trim()) },
-    { id: 'start', label: maxStartHolds > 1 ? `1 or ${maxStartHolds} start holds` : '1 start hold', done: starts >= 1 && starts <= maxStartHolds },
-    { id: 'finish', label: `${finishHolds} finish hold`, done: finishes === finishHolds },
+    { id: 'start', label: `Between ${minStartHolds} and ${maxStartHolds} start holds`, done: starts >= minStartHolds && starts <= maxStartHolds },
+    { id: 'finish', label: `Exactly ${finishHolds} finish hold`, done: finishes === finishHolds },
   ]
   const ready = checks.every((check) => check.done) && Boolean(wallType)
 
@@ -90,7 +89,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
       {
         gridRow: row,
         gridCol: col,
-        role: DEFAULT_ROLE,
+        role: defaultHoldRole,
         rotation: 0,
         holdId: catalogHold.id,
         imageUrl: catalogHold.imageUrl,
@@ -112,7 +111,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
   }
 
   function setRotation(degrees) {
-    updateSelectedHold({ rotation: normalizeRotation(degrees) }, { record: !draggingRotation.current })
+    updateSelectedHold({ rotation: normalizeRotation(degrees, maxRotation) }, { record: !draggingRotation.current })
   }
 
   function handleRotationEnd() {
@@ -141,7 +140,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
         event.preventDefault()
         removeHold()
       } else if (selectedHold && event.key.toLowerCase() === 'r') {
-        updateSelectedHold({ rotation: normalizeRotation(selectedHold.rotation + 15) })
+        updateSelectedHold({ rotation: normalizeRotation(selectedHold.rotation + 15, maxRotation) })
       } else if (event.key === 'Escape') {
         setSelectedCell(null)
       }
@@ -208,7 +207,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
                           type="button"
                           aria-pressed={selectedHold.role === item}
                           disabled={disabled}
-                          title={disabled ? (item === 'start' ? `A route can have at most ${maxStartHolds} start holds` : `A route can have only ${finishHolds} finish hold`) : undefined}
+                          title={disabled ? (item === 'start' ? `A route can have between ${minStartHolds} and ${maxStartHolds} start holds` : `A route can have only ${finishHolds} finish hold`) : undefined}
                           onClick={() => updateSelectedHold({ role: item })}
                         >
                           <i className="dot" style={{ background: roleColor(item) }} />{item}
@@ -222,6 +221,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
                   <RotationDial
                     value={selectedHold.rotation}
                     imageUrl={selectedHold.imageUrl}
+                    maxRotation={maxRotation}
                     onChangeStart={handleRotationStart}
                     onChange={setRotation}
                     onChangeEnd={handleRotationEnd}
@@ -265,7 +265,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
           <h2 className="panel-title"><span className="step">1</span> Route details</h2>
           <label className="field">
             <span>Route name</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Moonwalk" maxLength={60} />
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Moonwalk" maxLength={maxNameLength} />
           </label>
 
           <fieldset className="field">

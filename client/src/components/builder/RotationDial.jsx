@@ -2,11 +2,11 @@ import { useRef, useState } from 'react'
 import { normalizeRotation } from '../../utils/rotation'
 import './RotationDial.css'
 
-// Knob for any rotation from 0 to 359°, plus a box to type an exact value.
+// Knob for any rotation from 0 to maxRotation°, plus a box to type an exact value.
 // 0° points up and angles go clockwise, matching CSS rotate() on the 2D wall.
 // onChangeStart fires when a drag begins, onChange on every change, onChangeEnd when the drag ends.
 // Keyboard and typed changes only fire onChange.
-function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl }) {
+function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl, maxRotation = 359 }) {
   const knob = useRef(null)
   const [dragging, setDragging] = useState(false)
   // What's typed in the box while editing; null shows the current value
@@ -16,7 +16,7 @@ function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl })
     const box = knob.current.getBoundingClientRect()
     const x = event.clientX - (box.left + box.width / 2)
     const y = event.clientY - (box.top + box.height / 2)
-    return normalizeRotation((Math.atan2(x, -y) * 180) / Math.PI)
+    return normalizeRotation((Math.atan2(x, -y) * 180) / Math.PI, maxRotation)
   }
 
   function handlePointerDown(event) {
@@ -41,7 +41,7 @@ function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl })
   function handleKeyDown(event) {
     const step = event.shiftKey ? 15 : 1
     const moves = { ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step, PageUp: 45, PageDown: -45 }
-    if (event.key in moves) onChange(normalizeRotation(value + moves[event.key]))
+    if (event.key in moves) onChange(normalizeRotation(value + moves[event.key], maxRotation))
     else if (event.key === 'Home') onChange(0)
     else return
     event.preventDefault()
@@ -50,7 +50,7 @@ function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl })
 
   function commitText() {
     const number = Number(draft)
-    if (draft !== null && draft.trim() !== '' && !Number.isNaN(number)) onChange(normalizeRotation(number))
+    if (draft !== null && draft.trim() !== '' && !Number.isNaN(number)) onChange(normalizeRotation(number, maxRotation))
     setDraft(null)
   }
 
@@ -63,7 +63,7 @@ function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl })
         tabIndex={0}
         aria-label="Hold rotation"
         aria-valuemin={0}
-        aria-valuemax={359}
+        aria-valuemax={maxRotation}
         aria-valuenow={value}
         aria-valuetext={`${value} degrees`}
         onPointerDown={handlePointerDown}
@@ -85,7 +85,7 @@ function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl })
           type="number"
           inputMode="numeric"
           min={0}
-          max={359}
+          max={maxRotation}
           value={draft ?? value}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commitText}

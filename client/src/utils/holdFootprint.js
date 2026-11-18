@@ -1,4 +1,4 @@
-// Footprint math for holds on the bolt grid from the catalog. Distances are in bolt cells.
+// Footprint math for holds on the bolt grid (dimensions from the catalog). Distances are in bolt cells.
 
 // How big each size is drawn, as a multiple of one bolt cell. Medium is the baseline:
 // small is 50% of medium and large is 150% of medium.
