@@ -7,7 +7,11 @@ export async function request(path, options = {}) {
     ...options,
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error ?? 'Something went wrong. Try again.')
+  if (!response.ok) {
+    const error = new Error(data.error ?? 'Something went wrong. Try again.')
+    error.status = response.status
+    throw error
+  }
   return data
 }
 
@@ -22,9 +26,9 @@ function toClientRoute(route) {
     id: route.id,
     name: route.name,
     grade: route.grade,
-    angle: route.angle_degrees,
-    wallTypeId: route.wall_type_id,
-    wallType: capitalize(route.wall_type),
+    angle: route.angleDegrees,
+    wallType: capitalize(route.wallType),
+    createdAt: route.createdAt,
     holds: route.holds.map((hold) => ({
       holdId: hold.holdId,
       imageUrl: hold.imageUrl,
@@ -44,8 +48,7 @@ function toApiRoute(route) {
   return {
     name: route.name,
     grade: route.grade,
-    angle_degrees: route.angle,
-    wall_type_id: route.wallTypeId,
+    angleDegrees: route.angle,
     holds: route.holds.map((hold) => ({
       holdId: hold.holdId,
       gridRow: hold.row,
@@ -64,7 +67,7 @@ export const createRoute = async (route) =>
   toClientRoute(await request('/routes', { method: 'POST', body: JSON.stringify(toApiRoute(route)) }))
 
 export const updateRoute = async (route) =>
-  toClientRoute(await request(`/routes/${route.id}`, { method: 'PATCH', body: JSON.stringify(toApiRoute(route)) }))
+  toClientRoute(await request(`/routes/${route.id}`, { method: 'PUT', body: JSON.stringify(toApiRoute(route)) }))
 
 export const deleteRoute = (id) => request(`/routes/${id}`, { method: 'DELETE' })
 

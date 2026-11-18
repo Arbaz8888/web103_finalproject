@@ -2,7 +2,7 @@
 
 Guidance for AI coding agents working in this repo. Human-oriented explanation lives in `ARCHITECTURE.md`.
 
-> Scope: backend (`/server`), the client↔API contract, and the frontend (`/client`). Describes the code before the refactors in `backend-refactor-plan.md`.
+> Scope: backend (`/server`), the client↔API contract, and the frontend (`/client`). The backend and API contract describe the code **after** `backend-refactor-plan.md`. The frontend is still pre-refactor (see `frontend-refactor-plan.md`).
 
 ## Project
 
@@ -13,45 +13,50 @@ Custom Climbing Route Maker: build bouldering routes on a 12 × 16 virtual wall,
 - Monorepo: `/server` (Express 5, `pg`, ESM, no ORM) and `/client` (React + Vite).
 - Run from the repo root:
   - `npm run dev`: client (:5173) + server (:3000). Vite proxies `/api` → `:3000`.
-  - `npm run reset`: **drops and recreates every table and enum**, then reseeds. Destructive. Don't run it against a shared DB without asking.
+  - `npm run reset`: **drops and recreates every table and enum**, then reseeds, in one transaction. Destructive. Don't run it against a shared DB without asking.
   - `npm start`: server only.
-- Env: the repo-root `.env` (see `.env.example`), loaded by `server/config/dotenv.js`. Never commit `.env`.
-- There is no test suite or linter for the server. To verify, start the server and `curl` the endpoints. Only use GET requests unless the user OKs writes. `POST /api/routes/reset` wipes the DB.
+- Env: the repo-root `.env` (see `.env.example`), loaded by `server/config/dotenv.js`. Never commit `.env`. `client/.env.example` documents `VITE_API_URL` (production only).
+- There is no test suite or linter for the server. To verify, start the server and `curl` the endpoints. Only use GET requests unless the user OKs writes. `POST /api/routes/reset` deletes every user-created route.
 
 ## Server layout (router → controller → SQL)
 
-- `server.js`: mounts `/api/holds`, `/api/wall-types`, `/api/routes`, `/api/options`.
-- `routes/*.js`: thin; only map verb + path → controller.
-- `controllers/*.js`: validation + raw SQL via `pool` from `config/database.js` + response.
-- `config/reset.js`: schema DDL **and** seed logic. Exports `seedAllTables()`. Running it directly seeds and closes the pool (guarded by a `process.argv[1]` check).
+- `server.js`: mounts `/api/holds`, `/api/wall-types`, `/api/routes`, `/api/options`, then `notFound` for any other `/api/*` path, then `errorHandler`.
+- `routes/*.js`: thin; only map verb + path → controller. `routes/climbingRoutes.js` also has a `router.param('id')` guard.
+- `controllers/*.js`: validation + raw SQL via `pool` from `config/database.js` + response. No `try/catch` just to send an error; Express 5 forwards rejected promises to `errorHandler`.
+- `config/rules.js`: the shared domain rules (grid size, hold limits, max rotation, max name length, default hold role).
+- `config/database.js`: the `pool`, and `withTransaction(work)` for `BEGIN`/`COMMIT`/`ROLLBACK`.
+- `config/reset.js`: the `npm run reset` CLI only. It has no exports.
+- `db/schema.js`: `createSchema(client)` drops and recreates every enum and table.
+- `db/seed.js`: `seedReferenceData(client)` (wall types, holds) and `seedStarterRoutes(client)` (routes and their holds). Seeds don't catch errors.
+- `middleware/errors.js`: `notFound` and `errorHandler`.
 - `data/*.js`: seed rows with explicit ids.
 
 ## Invariants (do not break)
 
-1. **Postgres enums are the source of truth** for grades, hold roles/types/sizes and wall angles. The client fetches them from `GET /api/options`. Never hardcode these lists in the client. To change one, edit the `CREATE TYPE` in `config/reset.js` (and the seeds) and reset.
-2. Hold-count limits `MAX_START_HOLDS` (2) and `FINISH_HOLDS` (1) are exported from `controllers/climbingRoutes.js` and served by `/api/options`. Change them there only.
-3. Grid is 16 rows (0–15, row 0 = top) × 12 cols (0–11). Enforced by DB `CHECK`s in `reset.js`. The client duplicates these numbers in `WallComponent.jsx` / `utils/holdFootprint.js`; keep them in sync.
-4. A route's wall type must match its angle (`wallTypeMatchesAngle`). The client derives `wallTypeId` from the angle using `/api/wall-types`.
-5. Create/update run in a transaction on a dedicated `pool.connect()` client. Always `ROLLBACK` on error and `release()` in `finally`.
-6. Update = **full replace**: the route row is updated, then all its `route_holds` are deleted and reinserted. The client sends `PATCH`, but the body must be complete.
-7. Error responses are always `{ error: string }`. In `climbingRoutes.js`, use `sendError()` so Postgres input errors (`22P02`, `23502`, `23503`, `23505`, `23514`) become 400.
-8. Seed inserts use explicit ids, so `resetIdSequence()` must run after each table's seed.
-9. Seed order: `wall_types` → `climbing_holds` → `climbing_routes` → `route_holds`.
+1. **Postgres enums are the source of truth** for grades, hold roles/types/sizes and wall angles. The client fetches them from `GET /api/options`. Never hardcode these lists in the client. To change one, edit the `CREATE TYPE` in `db/schema.js` (and the seeds) and run `npm run reset`.
+2. **Domain rules live in `config/rules.js`** (`GRID_ROWS`/`GRID_COLS`, `MIN_START_HOLDS`/`MAX_START_HOLDS`, `FINISH_HOLDS`, `MAX_ROTATION`, `MAX_ROUTE_NAME_LENGTH`, `DEFAULT_HOLD_ROLE`). Validation, the schema's `CHECK`s and `GET /api/options` all read from it. Change a rule there only. The client still duplicates the grid size in `WallComponent.jsx` / `utils/holdFootprint.js`; keep them in sync until the frontend refactor.
+3. Grid is 16 rows (0–15, row 0 = top) × 12 cols (0–11), enforced by DB `CHECK`s. Rotation is 0–359 (inclusive), also a `CHECK`.
+4. **The server derives a route's wall type from its angle** (`findWallTypeId`). The request body has no wall type. An angle outside every wall type's range is a 400.
+5. Create/update run through `withTransaction`, and re-read the saved route **inside** the transaction (`findRoute(client, id)`) before `COMMIT`.
+6. Update = **full replace**: the route row is updated, then all its `route_holds` are deleted and reinserted. The client sends `PUT`, and the body must be complete (rotation is required).
+7. Error responses are always `{ error: string }` with a user-readable message. Postgres error text never reaches the client: the five bad-input codes (`22P02`, `23502`, `23503`, `23505`, `23514`) map to friendly 400s in `middleware/errors.js`, and anything else is a logged 500.
+8. Seed inserts use explicit ids, so `resetIdSequence()` (in `db/seed.js`) must run after each table's seed.
+9. Seed order: `wall_types` → `climbing_holds` → `climbing_routes` → `route_holds`. Starter routes must satisfy every rule the API enforces, including the client's hold-overlap rule.
+10. `POST /api/routes/reset` reseeds **routes only** (`seedStarterRoutes`) in one transaction. `npm run reset` is the only thing that rebuilds the schema.
 
-## API contract (field casing matters)
+## API contract (everything is camelCase)
 
-- Route request body: `{ name, grade, angle_degrees, wall_type_id, holds: [{ holdId, gridRow, gridCol, role, rotation }] }`
-- Route response: route fields are **snake_case**, but nested `holds[]` are **camelCase** (built in SQL by `json_build_object` in `SELECT_ROUTES`). Includes `wall_type` (enum name) and `routeHoldId`.
-- `GET /api/holds` returns raw **snake_case** rows (`hold_type`, `image_url`).
-- The client translates every payload in `client/src/api/*.js` (`toClientRoute`, `toApiRoute`, `fetchHolds`, `getOptions`). If you change a server field, update those mappers in the same change.
-- `useRoute` (client) detects a 404 by regex-matching `/not found/i` on the error message. Keep the message `'Route not found.'` or update the hook.
+- Route request body (POST/PUT): `{ name, grade, angleDegrees, holds: [{ holdId, gridRow, gridCol, role, rotation }] }`
+- Route response: `{ id, name, grade, angleDegrees, wallTypeId, wallType, createdAt, holds: [{ routeHoldId, holdId, imageUrl, size, holdType, color, gridRow, gridCol, role, rotation }] }`. Built in SQL by `SELECT_ROUTES` (column aliases) and `json_build_object`. Database columns stay snake_case.
+- `GET /api/holds`: `[{ id, name, holdType, size, color, imageUrl }]`. `GET /api/wall-types`: `[{ id, name, minAngle, maxAngle, description }]`.
+- `GET /api/options`: `{ grades, holdRoles, holdTypes, holdSizes, gridRows, gridCols, minStartHolds, maxStartHolds, finishHolds, maxRotation, maxNameLength, defaultHoldRole }`.
+- `GET /api/routes/:id` and `DELETE /api/routes/:id` return 404 `Route not found.` for a missing **or malformed** id. `PUT` returns 404 for a missing route. Any unknown `/api/*` path returns 404 `{ error: 'Not found.' }`.
+- The client translates payloads in `client/src/api/routes.js` (`toClientRoute`, `toApiRoute`). `api/holds.js` and `api/options.js` pass the response through. If you change a server field, update those in the same change.
+- `useRoute` (client) detects a missing route with `err.status === 404`. `request()` in `api/routes.js` attaches the HTTP status to every error it throws.
 
 ## Known quirks
 
-- Seed data has negative `rotation` values (e.g. `-10`), but `validateRoute` only accepts 0–359. This works only because the client's `normalizeRotation` maps reads to 0–359 before re-saving.
-- `POST /api/routes/reset` reseeds **all** tables (holds and wall types too, not just routes), has no auth, and always returns 200. The seed helpers catch and log their own errors.
-- `PUT` and `PATCH /api/routes/:id` both map to the same full-replace handler.
-- Postgres error messages are returned to the client verbatim in 400/500 responses.
+- `POST /api/routes/reset` has **no authentication**. This is deliberate for the demo.
 
 ## Frontend layout (`/client/src`)
 
@@ -72,8 +77,9 @@ Custom Climbing Route Maker: build bouldering routes on a 12 × 16 virtual wall,
 
 ## Frontend known quirks (pre-refactor)
 
-- The grid size (16 × 12) is hardcoded in `WallComponent.jsx`, `WallComponent.css`, `Wall3DComponent.jsx` (including the derived `5.5`/`7.5` centering), and the gallery hero text.
-- The hold-overlap rule (`holdFootprint.js`) exists only on the client. Starter route 1 breaks it (seed holds 1 and 3).
+- The grid size (16 × 12) is hardcoded in `WallComponent.jsx`, `WallComponent.css`, `Wall3DComponent.jsx` (including the derived `5.5`/`7.5` centering), and the gallery hero text. `/api/options` now serves it as `gridRows`/`gridCols`, but the client doesn't read it yet.
+- The hold-overlap rule (`holdFootprint.js`) exists only on the client. The server doesn't enforce it, but the starter routes follow it.
+- The client still keeps its own copies of a few rules (for example the `'hand'` default role, the 60-character name limit and the start-hold checklist labels). `/api/options` serves them now (`defaultHoldRole`, `maxNameLength`, `minStartHolds`, `maxStartHolds`).
 - The 3D chunk loads on the homepage, because the hero shows a 3D showcase.
 
 ## Conventions

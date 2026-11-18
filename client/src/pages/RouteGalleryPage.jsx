@@ -21,7 +21,7 @@ function RouteGalleryPage({ routes, onReset }) {
   const [previewRoute, setPreviewRoute] = useState(null)
   const [confirmReset, setConfirmReset] = useState(false)
 
-  // Routes arrive newest first from the API, so "newest" keeps that order
+  // Filter by query/grade/wall type, then sort by the chosen order
   const visibleRoutes = useMemo(() => {
     const query = filters.query.trim().toLowerCase()
     const filtered = routes.filter(
@@ -30,7 +30,7 @@ function RouteGalleryPage({ routes, onReset }) {
         (!filters.grade || route.grade === filters.grade) &&
         (!filters.wallType || route.wallType === filters.wallType),
     )
-    if (filters.sort === 'newest') return filtered
+    if (filters.sort === 'newest') return [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     const direction = filters.sort === 'easiest' ? 1 : -1
     return [...filtered].sort((a, b) => direction * (grades.indexOf(a.grade) - grades.indexOf(b.grade)))
   }, [filters, grades, routes])

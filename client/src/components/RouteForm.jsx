@@ -34,9 +34,9 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
 
   const selectedHold = holds.find((hold) => sameSpot(hold, selectedCell))
   // One slider covers every wall type; the type follows from the angle
-  const minAngle = Math.min(...wallTypes.map((type) => type.min_angle))
-  const maxAngle = Math.max(...wallTypes.map((type) => type.max_angle))
-  const wallType = wallTypes.find((type) => angle >= type.min_angle && angle <= type.max_angle)
+  const minAngle = Math.min(...wallTypes.map((type) => type.minAngle))
+  const maxAngle = Math.max(...wallTypes.map((type) => type.maxAngle))
+  const wallType = wallTypes.find((type) => angle >= type.minAngle && angle <= type.maxAngle)
   const starts = holds.filter((hold) => hold.role === 'start').length
   const finishes = holds.filter((hold) => hold.role === 'finish').length
 
@@ -147,7 +147,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     setError('')
     setSaving(true)
     try {
-      await onSave({ id: existing?.id, name: name.trim(), grade, wallTypeId: wallType.id, angle, holds })
+      await onSave({ id: existing?.id, name: name.trim(), grade, angle, holds })
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -288,13 +288,13 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
               onChange={(event) => setAngle(Number(event.target.value))}
               aria-valuetext={`${angle} degrees, ${wallType?.name ?? 'unknown'} wall`}
             />
-            {/* Each wall type's share of the slider, from the wall_types table */}
+            {/* Each wall type's share of the slider, from the wall types */}
             <div className="wall-type-scale" aria-hidden="true">
               {wallTypes.map((type) => (
                 <span
                   key={type.id}
                   className={type.id === wallType?.id ? 'current' : ''}
-                  style={{ flexGrow: type.max_angle - type.min_angle + 1 }}
+                  style={{ flexGrow: type.maxAngle - type.minAngle + 1 }}
                 >
                   {type.name}
                 </span>

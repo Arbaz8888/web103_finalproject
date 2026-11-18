@@ -1,26 +1,36 @@
 import { pool } from '../config/database.js';
-import { FINISH_HOLDS, MAX_START_HOLDS } from './climbingRoutes.js';
+import {
+	DEFAULT_HOLD_ROLE,
+	FINISH_HOLDS,
+	GRID_COLS,
+	GRID_ROWS,
+	MAX_ROTATION,
+	MAX_ROUTE_NAME_LENGTH,
+	MAX_START_HOLDS,
+	MIN_START_HOLDS,
+} from '../config/rules.js';
 
-// The allowed values for grades and hold fields come straight from the database enums
-// (see config/reset.js), and the hold limits come from the same rules the save check uses,
-// so the frontend never keeps its own copy of any of them.
+// Serves the allowed values for grades and hold fields (straight from the database enums,
+// see db/schema.js) plus every rule in config/rules.js, so the frontend never keeps its own copy.
 const getOptions = async (req, res) => {
-	try {
-		const results = await pool.query(`
-			SELECT
-				enum_range(NULL::grades)::text[] AS grades,
-				enum_range(NULL::hold_roles)::text[] AS hold_roles,
-				enum_range(NULL::hold_types)::text[] AS hold_types,
-				enum_range(NULL::hold_sizes)::text[] AS hold_sizes
-		`);
-		res.status(200).json({
-			...results.rows[0],
-			max_start_holds: MAX_START_HOLDS,
-			finish_holds: FINISH_HOLDS,
-		});
-	} catch (error) {
-		res.status(500).json({ error: error.message });
-	}
+	const results = await pool.query(`
+		SELECT
+			enum_range(NULL::grades)::text[] AS grades,
+			enum_range(NULL::hold_roles)::text[] AS "holdRoles",
+			enum_range(NULL::hold_types)::text[] AS "holdTypes",
+			enum_range(NULL::hold_sizes)::text[] AS "holdSizes"
+	`);
+	res.status(200).json({
+		...results.rows[0],
+		gridRows: GRID_ROWS,
+		gridCols: GRID_COLS,
+		minStartHolds: MIN_START_HOLDS,
+		maxStartHolds: MAX_START_HOLDS,
+		finishHolds: FINISH_HOLDS,
+		maxRotation: MAX_ROTATION,
+		maxNameLength: MAX_ROUTE_NAME_LENGTH,
+		defaultHoldRole: DEFAULT_HOLD_ROLE,
+	});
 };
 
 export default { getOptions };

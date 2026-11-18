@@ -1,5 +1,14 @@
-import { pool } from '../config/database.js';
-import { seedAllTables } from '../config/reset.js';
+import { pool, withTransaction } from '../config/database.js';
+import { seedStarterRoutes } from '../db/seed.js';
+import {
+	FINISH_HOLDS,
+	GRID_COLS,
+	GRID_ROWS,
+	MAX_ROTATION,
+	MAX_ROUTE_NAME_LENGTH,
+	MAX_START_HOLDS,
+	MIN_START_HOLDS,
+} from '../config/rules.js';
 
 // Each route comes back with its wall type and an array of its placed holds
 const SELECT_ROUTES = `
@@ -7,10 +16,10 @@ const SELECT_ROUTES = `
 		cr.id,
 		cr.name,
 		cr.grade,
-		cr.angle_degrees,
-		cr.wall_type_id,
-		wt.name AS wall_type,
-		cr.created_at,
+		cr.angle_degrees AS "angleDegrees",
+		cr.wall_type_id AS "wallTypeId",
+		wt.name AS "wallType",
+		cr.created_at AS "createdAt",
 		COALESCE(
 			json_agg(
 				json_build_object(
@@ -34,56 +43,65 @@ const SELECT_ROUTES = `
 	LEFT JOIN climbing_holds ch ON ch.id = rh.hold_id
 `;
 
-// Postgres errors caused by bad input (bad id, missing field, unknown hold, same spot twice)
-const BAD_INPUT_CODES = ['22P02', '23502', '23503', '23505', '23514'];
 
-const sendError = (res, error) => {
-	const status = BAD_INPUT_CODES.includes(error.code) ? 400 : 500;
-	res.status(status).json({ error: error.message });
-};
-
-export const MAX_START_HOLDS = 2;
-export const FINISH_HOLDS = 1;
-const MAX_ROTATION = 360;
-
-// Save Check: a route needs a name, grade, wall type, angle, 1-2 start holds and exactly one finish hold
-const validateRoute = ({ name, grade, wall_type_id, angle_degrees, holds } = {}) => {
-	if (!name?.trim() || !grade || !wall_type_id) {
-		return 'A route needs a name, grade, and wall type.';
+// Save Check: a route needs a name, grade, angle, valid holds, 1-2 start holds and exactly one finish hold
+const validateRoute = ({ name, grade, angleDegrees, holds } = {}) => {
+	if (!name?.trim() || !grade) {
+		return 'A route needs a name and grade.';
 	}
-	if (!Number.isInteger(angle_degrees)) {
+	if (name.trim().length > MAX_ROUTE_NAME_LENGTH) {
+		return `Route names can be at most ${MAX_ROUTE_NAME_LENGTH} characters.`;
+	}
+	if (!Number.isInteger(angleDegrees)) {
 		return 'A route needs a wall angle in degrees.';
 	}
 	if (!Array.isArray(holds)) {
 		return 'A route needs a holds array.';
 	}
+	for (const hold of holds) {
+		if (!Number.isInteger(hold?.holdId)) {
+			return 'Each hold needs a hold id.';
+		}
+		const rowOk = Number.isInteger(hold.gridRow) && hold.gridRow >= 0 && hold.gridRow < GRID_ROWS;
+		const colOk = Number.isInteger(hold.gridCol) && hold.gridCol >= 0 && hold.gridCol < GRID_COLS;
+		if (!rowOk || !colOk) {
+			return 'A hold is placed off the wall.';
+		}
+		if (typeof hold.role !== 'string') {
+			return 'Each hold needs a role.';
+		}
+	}
+	const spots = new Set(holds.map((hold) => `${hold.gridRow},${hold.gridCol}`));
+	if (spots.size !== holds.length) {
+		return "Two holds can't share the same spot on the wall.";
+	}
 	const starts = holds.filter((hold) => hold.role === 'start').length;
 	const finishes = holds.filter((hold) => hold.role === 'finish').length;
-	if (starts < 1 || starts > MAX_START_HOLDS) {
-		return `A route needs 1 or ${MAX_START_HOLDS} start holds.`;
+	if (starts < MIN_START_HOLDS || starts > MAX_START_HOLDS) {
+		return `A route needs between ${MIN_START_HOLDS} and ${MAX_START_HOLDS} start holds.`;
 	}
 	if (finishes !== FINISH_HOLDS) {
-		return 'A route needs exactly one finish hold.';
+		return `A route needs exactly ${FINISH_HOLDS} finish hold.`;
 	}
-	if (holds.some((hold) => !Number.isInteger(hold.rotation ?? 0) || hold.rotation < 0 || hold.rotation >= MAX_ROTATION)) {
+	if (holds.some((hold) => !Number.isInteger(hold.rotation) || hold.rotation < 0 || hold.rotation > MAX_ROTATION)) {
 		return 'Hold rotation must be a whole number from 0 to 359 degrees.';
 	}
 	return null;
 };
 
-// The wall type must be the one whose angle range contains the route's angle
-const wallTypeMatchesAngle = async (client, wallTypeId, angle) => {
-	const results = await client.query(
-		'SELECT 1 FROM wall_types WHERE id = $1 AND $2 BETWEEN min_angle AND max_angle',
-		[wallTypeId, angle]
+// Each wall type covers an angle range; the route's angle picks its type
+const findWallTypeId = async (angle) => {
+	const results = await pool.query(
+		'SELECT id FROM wall_types WHERE $1 BETWEEN min_angle AND max_angle',
+		[angle]
 	);
-	return results.rowCount > 0;
+	return results.rows[0]?.id ?? null;
 };
 
 const insertRouteHolds = (client, routeId, holds) => {
 	const values = [routeId];
 	const rows = holds.map((hold) => {
-		values.push(hold.holdId, hold.gridRow, hold.gridCol, hold.role, hold.rotation ?? 0);
+		values.push(hold.holdId, hold.gridRow, hold.gridCol, hold.role, hold.rotation);
 		const n = values.length;
 		return `($1, $${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`;
 	});
@@ -95,32 +113,25 @@ const insertRouteHolds = (client, routeId, holds) => {
 	);
 };
 
-const findRoute = async (id) => {
-	const results = await pool.query(`${SELECT_ROUTES} WHERE cr.id = $1 GROUP BY cr.id, wt.id`, [id]);
+// db is the pool, or a transaction client when the route must be read before COMMIT
+const findRoute = async (db, id) => {
+	const results = await db.query(`${SELECT_ROUTES} WHERE cr.id = $1 GROUP BY cr.id, wt.id`, [id]);
 	return results.rows[0];
 };
 
 const getRoutes = async (req, res) => {
-	try {
-		const results = await pool.query(
-			`${SELECT_ROUTES} GROUP BY cr.id, wt.id ORDER BY cr.created_at DESC`
-		);
-		res.status(200).json(results.rows);
-	} catch (error) {
-		sendError(res, error);
-	}
+	const results = await pool.query(
+		`${SELECT_ROUTES} GROUP BY cr.id, wt.id ORDER BY cr.created_at DESC`
+	);
+	res.status(200).json(results.rows);
 };
 
 const getRouteById = async (req, res) => {
-	try {
-		const route = await findRoute(req.params.id);
-		if (!route) {
-			return res.status(404).json({ error: 'Route not found.' });
-		}
-		res.status(200).json(route);
-	} catch (error) {
-		sendError(res, error);
+	const route = await findRoute(pool, req.params.id);
+	if (!route) {
+		return res.status(404).json({ error: 'Route not found.' });
 	}
+	res.status(200).json(route);
 };
 
 const createRoute = async (req, res) => {
@@ -129,29 +140,22 @@ const createRoute = async (req, res) => {
 		return res.status(400).json({ error: message });
 	}
 
-	const { name, grade, angle_degrees, wall_type_id, holds } = req.body;
-	const client = await pool.connect();
+	const { name, grade, angleDegrees, holds } = req.body;
+	const wallTypeId = await findWallTypeId(angleDegrees);
+	if (wallTypeId === null) {
+		return res.status(400).json({ error: "The wall angle doesn't match any wall type." });
+	}
 
-	try {
-		if (!(await wallTypeMatchesAngle(client, wall_type_id, angle_degrees))) {
-			return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
-		}
-		await client.query('BEGIN');
+	const route = await withTransaction(async (client) => {
 		const results = await client.query(
 			'INSERT INTO climbing_routes (name, grade, angle_degrees, wall_type_id) VALUES ($1, $2, $3, $4) RETURNING id',
-			[name.trim(), grade, angle_degrees, wall_type_id]
+			[name.trim(), grade, angleDegrees, wallTypeId]
 		);
 		const routeId = results.rows[0].id;
 		await insertRouteHolds(client, routeId, holds);
-		await client.query('COMMIT');
-
-		res.status(201).json(await findRoute(routeId));
-	} catch (error) {
-		await client.query('ROLLBACK');
-		sendError(res, error);
-	} finally {
-		client.release();
-	}
+		return findRoute(client, routeId);
+	});
+	res.status(201).json(route);
 };
 
 const updateRoute = async (req, res) => {
@@ -161,60 +165,48 @@ const updateRoute = async (req, res) => {
 	}
 
 	const { id } = req.params;
-	const { name, grade, angle_degrees, wall_type_id, holds } = req.body;
-	const client = await pool.connect();
+	const { name, grade, angleDegrees, holds } = req.body;
+	const wallTypeId = await findWallTypeId(angleDegrees);
+	if (wallTypeId === null) {
+		return res.status(400).json({ error: "The wall angle doesn't match any wall type." });
+	}
 
-	try {
-		if (!(await wallTypeMatchesAngle(client, wall_type_id, angle_degrees))) {
-			return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
-		}
-		await client.query('BEGIN');
+	// Returns null when no route has this id (nothing was written, so COMMIT is harmless)
+	const route = await withTransaction(async (client) => {
 		const results = await client.query(
 			'UPDATE climbing_routes SET name = $1, grade = $2, angle_degrees = $3, wall_type_id = $4 WHERE id = $5',
-			[name.trim(), grade, angle_degrees, wall_type_id, id]
+			[name.trim(), grade, angleDegrees, wallTypeId, id]
 		);
 		if (results.rowCount === 0) {
-			await client.query('ROLLBACK');
-			return res.status(404).json({ error: 'Route not found.' });
+			return null;
 		}
 
 		// Swap out all the old holds for the new ones
 		await client.query('DELETE FROM route_holds WHERE route_id = $1', [id]);
 		await insertRouteHolds(client, id, holds);
-		await client.query('COMMIT');
-
-		res.status(200).json(await findRoute(id));
-	} catch (error) {
-		await client.query('ROLLBACK');
-		sendError(res, error);
-	} finally {
-		client.release();
+		return findRoute(client, id);
+	});
+	if (!route) {
+		return res.status(404).json({ error: 'Route not found.' });
 	}
+	res.status(200).json(route);
 };
 
 const deleteRoute = async (req, res) => {
-	try {
-		// route_holds rows go away on their own (ON DELETE CASCADE)
-		const results = await pool.query(
-			'DELETE FROM climbing_routes WHERE id = $1 RETURNING id',
-			[req.params.id]
-		);
-		if (results.rowCount === 0) {
-			return res.status(404).json({ error: 'Route not found.' });
-		}
-		res.status(200).json({ id: results.rows[0].id });
-	} catch (error) {
-		sendError(res, error);
+	// route_holds rows go away on their own (ON DELETE CASCADE)
+	const results = await pool.query(
+		'DELETE FROM climbing_routes WHERE id = $1 RETURNING id',
+		[req.params.id]
+	);
+	if (results.rowCount === 0) {
+		return res.status(404).json({ error: 'Route not found.' });
 	}
+	res.status(200).json({ id: results.rows[0].id });
 };
 
 const resetRoutes = async (req, res) => {
-	try {
-		await seedAllTables();
-		res.status(200).json({ message: 'Wall reset to starter routes.' });
-	} catch (error) {
-		sendError(res, error);
-	}
+	await withTransaction(seedStarterRoutes);
+	res.status(200).json({ message: 'Wall reset to starter routes.' });
 };
 
 export default {

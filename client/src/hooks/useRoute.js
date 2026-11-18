@@ -12,7 +12,7 @@ export function useRoute(id) {
       .then((route) => !cancelled && setState({ id, status: 'ready', route, error: '' }))
       .catch((err) => {
         if (cancelled) return
-        const missing = /not found/i.test(err.message)
+        const missing = err.status === 404
         setState({ id, status: missing ? 'missing' : 'error', route: null, error: err.message })
       })
     return () => {
