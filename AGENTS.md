@@ -34,7 +34,7 @@ Custom Climbing Route Maker: build bouldering routes on a 12 × 16 virtual wall,
 ## Invariants (do not break)
 
 1. **Postgres enums are the source of truth** for grades, hold roles/types/sizes and wall angles. The client fetches them from `GET /api/options`. Never hardcode these lists in the client. To change one, edit the `CREATE TYPE` in `db/schema.js` (and the seeds) and run `npm run reset`.
-2. **Domain rules live in `config/rules.js`** (`GRID_ROWS`/`GRID_COLS`, `MIN_START_HOLDS`/`MAX_START_HOLDS`, `FINISH_HOLDS`, `MAX_ROTATION`, `MAX_ROUTE_NAME_LENGTH`, `DEFAULT_HOLD_ROLE`). Validation, the schema's `CHECK`s and `GET /api/options` all read from it. Change a rule there only. The client still duplicates the grid size in `WallComponent.jsx` / `utils/holdFootprint.js`; keep them in sync until the frontend refactor.
+2. **Domain rules live in `config/rules.js`** (`GRID_ROWS`/`GRID_COLS`, `MIN_START_HOLDS`/`MAX_START_HOLDS`, `FINISH_HOLDS`, `MAX_ROTATION`, `MAX_ROUTE_NAME_LENGTH`, `DEFAULT_HOLD_ROLE`). Validation, the schema's `CHECK`s and `GET /api/options` all read from it. Change a rule there only.  The client reads all of these from `useCatalog()`; never hardcode them there.
 3. Grid is 16 rows (0–15, row 0 = top) × 12 cols (0–11), enforced by DB `CHECK`s. Rotation is 0–359 (inclusive), also a `CHECK`.
 4. **The server derives a route's wall type from its angle** (`findWallTypeId`). The request body has no wall type. An angle outside every wall type's range is a 400.
 5. Create/update run through `withTransaction`, and re-read the saved route **inside** the transaction (`findRoute(client, id)`) before `COMMIT`.
@@ -51,8 +51,8 @@ Custom Climbing Route Maker: build bouldering routes on a 12 × 16 virtual wall,
 - `GET /api/holds`: `[{ id, name, holdType, size, color, imageUrl }]`. `GET /api/wall-types`: `[{ id, name, minAngle, maxAngle, description }]`.
 - `GET /api/options`: `{ grades, holdRoles, holdTypes, holdSizes, gridRows, gridCols, minStartHolds, maxStartHolds, finishHolds, maxRotation, maxNameLength, defaultHoldRole }`.
 - `GET /api/routes/:id` and `DELETE /api/routes/:id` return 404 `Route not found.` for a missing **or malformed** id. `PUT` returns 404 for a missing route. Any unknown `/api/*` path returns 404 `{ error: 'Not found.' }`.
-- The client translates payloads in `client/src/api/routes.js` (`toClientRoute`, `toApiRoute`). `api/holds.js` and `api/options.js` pass the response through. If you change a server field, update those in the same change.
-- `useRoute` (client) detects a missing route with `err.status === 404`. `request()` in `api/routes.js` attaches the HTTP status to every error it throws.
+- The client uses the API's field names directly: `getRoutes`/`getRoute`, `api/holds.js`, `api/options.js` and `api/wallTypes.js` pass responses through. `toApiRoute` in `client/src/api/routes.js` only strips display-only fields before sending. If you change a server field, update the components and `toApiRoute` in the same change.
+- `useRoute` (client) detects a missing route with `err.status === 404`. `request()` in `api/client.js` attaches the HTTP status to every error it throws.
 
 ## Known quirks
 
