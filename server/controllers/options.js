@@ -8,14 +8,14 @@ const getOptions = async (req, res) => {
 	const results = await pool.query(`
 		SELECT
 			enum_range(NULL::grades)::text[] AS grades,
-			enum_range(NULL::hold_roles)::text[] AS hold_roles,
-			enum_range(NULL::hold_types)::text[] AS hold_types,
-			enum_range(NULL::hold_sizes)::text[] AS hold_sizes
+			enum_range(NULL::hold_roles)::text[] AS "holdRoles",
+			enum_range(NULL::hold_types)::text[] AS "holdTypes",
+			enum_range(NULL::hold_sizes)::text[] AS "holdSizes"
 	`);
 	res.status(200).json({
 		...results.rows[0],
-		max_start_holds: MAX_START_HOLDS,
-		finish_holds: FINISH_HOLDS,
+		maxStartHolds: MAX_START_HOLDS,
+		finishHolds: FINISH_HOLDS,
 	});
 };
 

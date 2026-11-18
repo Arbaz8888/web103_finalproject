@@ -16,10 +16,10 @@ const SELECT_ROUTES = `
 		cr.id,
 		cr.name,
 		cr.grade,
-		cr.angle_degrees,
-		cr.wall_type_id,
-		wt.name AS wall_type,
-		cr.created_at,
+		cr.angle_degrees AS "angleDegrees",
+		cr.wall_type_id AS "wallTypeId",
+		wt.name AS "wallType",
+		cr.created_at AS "createdAt",
 		COALESCE(
 			json_agg(
 				json_build_object(
@@ -45,14 +45,14 @@ const SELECT_ROUTES = `
 
 
 // Save Check: a route needs a name, grade, wall type, angle, valid holds, 1-2 start holds and exactly one finish hold
-const validateRoute = ({ name, grade, wall_type_id, angle_degrees, holds } = {}) => {
-	if (!name?.trim() || !grade || !wall_type_id) {
+const validateRoute = ({ name, grade, wallTypeId, angleDegrees, holds } = {}) => {
+	if (!name?.trim() || !grade || !wallTypeId) {
 		return 'A route needs a name, grade, and wall type.';
 	}
 	if (name.trim().length > MAX_ROUTE_NAME_LENGTH) {
 		return `Route names can be at most ${MAX_ROUTE_NAME_LENGTH} characters.`;
 	}
-	if (!Number.isInteger(angle_degrees)) {
+	if (!Number.isInteger(angleDegrees)) {
 		return 'A route needs a wall angle in degrees.';
 	}
 	if (!Array.isArray(holds)) {
@@ -140,15 +140,15 @@ const createRoute = async (req, res) => {
 		return res.status(400).json({ error: message });
 	}
 
-	const { name, grade, angle_degrees, wall_type_id, holds } = req.body;
-	if (!(await wallTypeMatchesAngle(pool, wall_type_id, angle_degrees))) {
+	const { name, grade, angleDegrees, wallTypeId, holds } = req.body;
+	if (!(await wallTypeMatchesAngle(pool, wallTypeId, angleDegrees))) {
 		return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
 	}
 
 	const route = await withTransaction(async (client) => {
 		const results = await client.query(
 			'INSERT INTO climbing_routes (name, grade, angle_degrees, wall_type_id) VALUES ($1, $2, $3, $4) RETURNING id',
-			[name.trim(), grade, angle_degrees, wall_type_id]
+			[name.trim(), grade, angleDegrees, wallTypeId]
 		);
 		const routeId = results.rows[0].id;
 		await insertRouteHolds(client, routeId, holds);
@@ -164,8 +164,8 @@ const updateRoute = async (req, res) => {
 	}
 
 	const { id } = req.params;
-	const { name, grade, angle_degrees, wall_type_id, holds } = req.body;
-	if (!(await wallTypeMatchesAngle(pool, wall_type_id, angle_degrees))) {
+	const { name, grade, angleDegrees, wallTypeId, holds } = req.body;
+	if (!(await wallTypeMatchesAngle(pool, wallTypeId, angleDegrees))) {
 		return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
 	}
 
@@ -173,7 +173,7 @@ const updateRoute = async (req, res) => {
 	const route = await withTransaction(async (client) => {
 		const results = await client.query(
 			'UPDATE climbing_routes SET name = $1, grade = $2, angle_degrees = $3, wall_type_id = $4 WHERE id = $5',
-			[name.trim(), grade, angle_degrees, wall_type_id, id]
+			[name.trim(), grade, angleDegrees, wallTypeId, id]
 		);
 		if (results.rowCount === 0) {
 			return null;

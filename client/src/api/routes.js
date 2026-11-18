@@ -26,9 +26,10 @@ function toClientRoute(route) {
     id: route.id,
     name: route.name,
     grade: route.grade,
-    angle: route.angle_degrees,
-    wallTypeId: route.wall_type_id,
-    wallType: capitalize(route.wall_type),
+    angle: route.angleDegrees,
+    wallTypeId: route.wallTypeId,
+    wallType: capitalize(route.wallType),
+    createdAt: route.createdAt,
     holds: route.holds.map((hold) => ({
       holdId: hold.holdId,
       imageUrl: hold.imageUrl,
@@ -48,8 +49,8 @@ function toApiRoute(route) {
   return {
     name: route.name,
     grade: route.grade,
-    angle_degrees: route.angle,
-    wall_type_id: route.wallTypeId,
+    angleDegrees: route.angle,
+    wallTypeId: route.wallTypeId,
     holds: route.holds.map((hold) => ({
       holdId: hold.holdId,
       gridRow: hold.row,
