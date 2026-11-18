@@ -358,7 +358,7 @@ App  (useRouteList: status, routes[], reload, setRoutes)
         └── CatalogProvider  (options + wallTypes + holds → CatalogContext)
             ├── RouteGalleryPage  props: routes, status, error, onRetry, onReset
             │                     state: filters, previewRoute, confirmReset
-            │   ├── HeroWall (route with the most holds: 3D when idle, else 2D)
+            │   ├── HeroWall (route of the day: 3D when idle, else 2D)
             │   ├── RouteFilters → RouteGallery → RouteCard → WallComponent (sm)
             │   ├── QuickLookModal → Dialog → WallComponent
             │   └── ConfirmDialog (reset)

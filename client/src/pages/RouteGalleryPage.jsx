@@ -47,8 +47,14 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
     }
   }, [grades, routes])
 
-  // The busiest route makes the best-looking homepage wall
-  const featured = useMemo(() => routes.reduce((best, route) => (!best || route.holds.length > best.holds.length ? route : best), null), [routes])
+  // Route of the day: rotates through the routes (by id) once per local day, so it stays
+  // stable while browsing and changes tomorrow
+  const featured = useMemo(() => {
+    if (routes.length === 0) return null
+    const today = new Date()
+    const day = Math.floor(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) / 86400000)
+    return [...routes].sort((a, b) => a.id - b.id)[day % routes.length]
+  }, [routes])
 
   // Clears search, grade and wall type; the sort is a view preference and stays
   const clearFilters = () => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))
