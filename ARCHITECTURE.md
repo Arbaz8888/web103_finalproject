@@ -2,7 +2,7 @@
 
 This document explains how Custom Climbing Route Maker is put together. It's for teammates (and future us) who need to find their way around the code.
 
-> **Scope:** Sections 1–7 cover the **backend** (`/server`) and the API contract. Sections 8–13 cover the **frontend** (`/client`). Both describe the code as it is today, before the planned refactors in `backend-refactor-plan.md`.
+> **Scope:** Sections 1–7 cover the **backend** (`/server`) and the API contract. Sections 8–13 cover the **frontend** (`/client`). The backend sections describe the code **after** the refactor in `backend-refactor-plan.md`. The frontend sections are still the pre-refactor frontend (see `frontend-refactor-plan.md`), except where they touch the API contract.
 
 ---
 
@@ -23,12 +23,17 @@ This document explains how Custom Climbing Route Maker is put together. It's for
 
 ```
 server/
-├── server.js                 Entry point: loads env, mounts the four routers, starts listening
+├── server.js                 Entry point: loads env, mounts the routers, the JSON 404 and the error handler
 ├── config/
 │   ├── dotenv.js             Loads the repo-root .env (imported for its side effect)
-│   ├── database.js           Exports the shared pg Pool
-│   └── reset.js              Creates every table/enum and seeds starter data
-│                             (runs as a script AND is imported by the reset endpoint)
+│   ├── database.js           Exports the shared pg Pool and withTransaction(work)
+│   ├── rules.js              Domain rules shared by validation, the schema and /api/options
+│   └── reset.js              CLI for `npm run reset`: rebuild the schema and seed, in one transaction
+├── db/
+│   ├── schema.js             createSchema(client): drops and recreates every enum and table
+│   └── seed.js               seedReferenceData(client), seedStarterRoutes(client)
+├── middleware/
+│   └── errors.js             notFound (JSON 404 for /api/*) and errorHandler (friendly 400/500 messages)
 ├── routes/                   One Express Router per resource. Maps URL + verb → controller function
 │   ├── climbingRoutes.js
 │   ├── holds.js
@@ -39,7 +44,7 @@ server/
 │   ├── holds.js
 │   ├── options.js
 │   └── wallTypes.js
-└── data/                     Starter rows used by reset.js
+└── data/                     Starter rows used by db/seed.js
     ├── WallTypes.js
     ├── StartingHolds.js
     ├── StartingRoutes.js
@@ -67,7 +72,7 @@ wall_types 1 ──── * climbing_routes 1 ──── * route_holds * ─�
 
 ### Enums
 
-All of these are Postgres enums created in `config/reset.js`. **They are the single source of truth.** The frontend reads them at runtime via `GET /api/options` instead of keeping its own copy.
+All of these are Postgres enums created in `db/schema.js`. **They are the single source of truth.** The frontend reads them at runtime via `GET /api/options` instead of keeping its own copy.
 
 | Enum | Values |
 |---|---|
@@ -75,43 +80,58 @@ All of these are Postgres enums created in `config/reset.js`. **They are the sin
 | `grades` | V0 … V12 (the enum order is used as the difficulty order for sorting) |
 | `hold_types` | crimp, jug, sloper, pocket, pinch |
 | `hold_sizes` | small, medium, large |
-| `hold_roles` | start, hand, foot, any, finish |
+| `hold_roles` | start, hand, foot, finish (`hand` means a hand or a foot hold) |
 
 ### Constraints that act as business rules
 
+The numbers come from `server/config/rules.js` (the schema builds its `CHECK`s from them).
+
 - `route_holds.grid_row` is 0–15 and `grid_col` is 0–11. That's the 12 × 16 bolt grid. Row 0 is the top of the wall.
+- `route_holds.rotation` is 0–359.
+- `route_holds.role` defaults to `hand`.
+- `climbing_routes.name` is at most 60 characters.
 - `UNIQUE (route_id, grid_row, grid_col)`: a route can't have two holds on the same bolt.
 - Wall type ranges (from `data/WallTypes.js`): slab −20…−1°, vertical 0…5°, overhang 6…50°, roof 51…90°.
 
 ### Resetting and seeding
 
-`npm run reset` (from the repo root or `/server`) runs `config/reset.js`, which for each table:
+There are two different resets:
 
-1. `DROP TABLE … CASCADE` and `DROP TYPE` (the enum),
-2. recreates the enum and table,
-3. inserts the starter rows with **explicit ids**,
-4. moves the table's id sequence past the highest id, so new rows don't collide.
+- **`npm run reset`** runs `config/reset.js`. In **one transaction** it calls `createSchema` (drop every table and enum, recreate them), `seedReferenceData` (wall types and holds) and `seedStarterRoutes`. If anything fails the transaction rolls back, nothing changes and the script exits non-zero.
+- **`POST /api/routes/reset`** (the "Reset wall" button) only calls `seedStarterRoutes` in a transaction: it truncates `route_holds` and `climbing_routes`, restarts their ids, and reinserts the starter routes. Holds and wall types are left alone.
 
-Order matters because of foreign keys: `wall_types` → `climbing_holds` → `climbing_routes` → `route_holds`.
+Seed rows are inserted with **explicit ids**, so `seed.js` moves each table's id sequence past the highest id afterwards. The seed functions don't catch errors; a failure propagates to the transaction.
 
-The same `seedAllTables()` function is exported and called by `POST /api/routes/reset`, so the "Reset the wall" button in the app does exactly what `npm run reset` does.
+**The reset endpoint has no authentication.** That's a deliberate choice for the demo.
 
 ## 4. API reference
 
-All responses are JSON. Errors are always `{ "error": "message" }`.
+All responses are JSON. Errors are always `{ "error": "<user-readable message>" }`. Postgres error text never reaches the client. Every field is `camelCase`.
 
 | Method & path | Controller | What it does | Used by (client) |
 |---|---|---|---|
-| `GET /api/options` | `options.getOptions` | Enum values + hold-count limits | `api/options.js` → `App.jsx` → catalog context |
-| `GET /api/wall-types` | `wallTypes.getWallTypes` | All wall types, ordered by `min_angle` | `api/wallTypes.js` → `App.jsx` → catalog context |
+| `GET /api/options` | `options.getOptions` | Enum values plus every rule in `config/rules.js` | `api/options.js` → `App.jsx` → catalog context |
+| `GET /api/wall-types` | `wallTypes.getWallTypes` | All wall types, ordered by `minAngle` | `api/wallTypes.js` → `App.jsx` → catalog context |
 | `GET /api/holds` | `holds.getHolds` | The hold catalog | `api/holds.js` → `ClimbingHoldsDrawer` |
 | `GET /api/routes` | `climbingRoutes.getRoutes` | Every route with its holds, newest first | `api/routes.js` → `App.jsx` (gallery list) |
-| `GET /api/routes/:id` | `climbingRoutes.getRouteById` | One route with its holds | `hooks/useRoute.js` → details & edit pages |
-| `POST /api/routes` | `climbingRoutes.createRoute` | Create a route (validated) | `RouteForm` → `RouteBuilderPage` → `App.saveRoute` |
-| `PATCH /api/routes/:id` | `climbingRoutes.updateRoute` | Replace a route and **all** of its holds | `RouteForm` → `EditRoutePage` → `App.saveRoute` |
-| `PUT /api/routes/:id` | `climbingRoutes.updateRoute` | Same handler as PATCH (not used by the client) | — |
-| `DELETE /api/routes/:id` | `climbingRoutes.deleteRoute` | Delete a route (its holds cascade) | `RouteDetailsPage` → `App.deleteRoute` |
-| `POST /api/routes/reset` | `climbingRoutes.resetRoutes` | Drop and reseed the **whole database** | `RouteGalleryPage` → `App.resetRoutes` |
+| `GET /api/routes/:id` | `climbingRoutes.getRouteById` | One route with its holds. 404 if missing **or** the id isn't a positive 32-bit integer | `hooks/useRoute.js` → details & edit pages |
+| `POST /api/routes` | `climbingRoutes.createRoute` | Create a route (validated). 201 | `RouteForm` → `RouteBuilderPage` → `App.saveRoute` |
+| `PUT /api/routes/:id` | `climbingRoutes.updateRoute` | Replace a route and **all** of its holds | `RouteForm` → `EditRoutePage` → `App.saveRoute` |
+| `DELETE /api/routes/:id` | `climbingRoutes.deleteRoute` | Delete a route (its holds cascade). Returns `{ id }` | `RouteDetailsPage` → `App.deleteRoute` |
+| `POST /api/routes/reset` | `climbingRoutes.resetRoutes` | Reseed the **starter routes only**, in one transaction | `RouteGalleryPage` → `App.resetRoutes` |
+| anything else under `/api` | `middleware/errors.notFound` | 404 `{ "error": "Not found." }` | — |
+
+### `GET /api/options` (response)
+
+```jsonc
+{
+  "grades": ["V0", "...", "V12"], "holdRoles": ["start", "hand", "foot", "finish"],
+  "holdTypes": ["crimp", "jug", "sloper", "pocket", "pinch"], "holdSizes": ["small", "medium", "large"],
+  "gridRows": 16, "gridCols": 12,
+  "minStartHolds": 1, "maxStartHolds": 2, "finishHolds": 1,
+  "maxRotation": 359, "maxNameLength": 60, "defaultHoldRole": "hand"
+}
+```
 
 ### Route object (response)
 
@@ -120,10 +140,10 @@ All responses are JSON. Errors are always `{ "error": "message" }`.
   "id": 1,
   "name": "Easy Test",
   "grade": "V1",
-  "angle_degrees": 0,
-  "wall_type_id": 2,
-  "wall_type": "vertical",
-  "created_at": "2025-09-01T10:00:00.000Z",
+  "angleDegrees": 0,
+  "wallTypeId": 2,
+  "wallType": "vertical",
+  "createdAt": "2025-09-01T10:00:00.000Z",
   "holds": [
     {
       "routeHoldId": 1, "holdId": 6,
@@ -134,7 +154,7 @@ All responses are JSON. Errors are always `{ "error": "message" }`.
 }
 ```
 
-Note that the route's own fields are `snake_case` but the nested hold fields are `camelCase`. That's because the holds are built inside SQL with `json_build_object(...)` in `SELECT_ROUTES`.
+The database columns stay `snake_case`; the SQL aliases them (`cr.angle_degrees AS "angleDegrees"`, and so on) so the API is camelCase throughout.
 
 ### Route body (create / update request)
 
@@ -142,36 +162,48 @@ Note that the route's own fields are `snake_case` but the nested hold fields are
 {
   "name": "My Route",
   "grade": "V3",
-  "angle_degrees": 20,
-  "wall_type_id": 3,
+  "angleDegrees": 20,
   "holds": [
     { "holdId": 6, "gridRow": 14, "gridCol": 4, "role": "start", "rotation": 0 }
   ]
 }
 ```
 
+There is no wall type in the body. **The server derives the wall type from the angle** (`findWallTypeId`): the wall type whose `minAngle`…`maxAngle` range contains `angleDegrees`. An angle that fits no wall type is a 400.
+
 ### The "Save Check" (user story 6)
 
 A save goes through three layers of checking, in this order:
 
-1. **`validateRoute()`** in `controllers/climbingRoutes.js` (plain JS, before touching the DB):
-   - `name` (non-blank), `grade` and `wall_type_id` are present
-   - `angle_degrees` is an integer
-   - `holds` is an array with **1 – `MAX_START_HOLDS` (2)** start holds and **exactly `FINISH_HOLDS` (1)** finish hold
-   - every `rotation` is an integer from 0 to 359
-2. **`wallTypeMatchesAngle()`**: the chosen wall type's angle range must contain `angle_degrees`.
-3. **Postgres constraints**: unknown grade/role (bad enum), unknown `holdId` (foreign key), off-grid position (CHECK), two holds on one bolt (UNIQUE). `sendError()` turns these specific error codes into a `400`, and everything else into a `500`.
+1. **`validateRoute()`** in `controllers/climbingRoutes.js` (plain JS, before touching the DB). The first failing check wins:
+   - `name` (non-blank) and `grade` are present, and the trimmed name is at most `MAX_ROUTE_NAME_LENGTH` (60) characters
+   - `angleDegrees` is an integer
+   - `holds` is an array, and each hold has an integer `holdId`, an on-grid `gridRow`/`gridCol` and a string `role`
+   - no two holds share the same `gridRow`/`gridCol`
+   - between `MIN_START_HOLDS` (1) and `MAX_START_HOLDS` (2) start holds, and exactly `FINISH_HOLDS` (1) finish hold
+   - every `rotation` is an integer from 0 to `MAX_ROTATION` (359). Rotation is required.
+2. **`findWallTypeId()`**: the angle must fall inside some wall type's range.
+3. **Postgres constraints**: unknown grade/role (bad enum), unknown `holdId` (foreign key), off-grid position (CHECK), two holds on one bolt (UNIQUE). These are a safety net: `middleware/errors.js` maps their error codes (`22P02`, `23502`, `23503`, `23505`, `23514`) to a friendly 400 message.
 
 The frontend `RouteForm` mirrors rule 1 using the limits from `/api/options`, so the Save button is disabled until the route would pass.
 
+### Error handling
+
+Controllers don't catch errors. Express 5 forwards a rejected async handler to `errorHandler` in `middleware/errors.js`, which sends:
+
+- **400** with a friendly message for the five Postgres bad-input codes, and for a malformed JSON body (`The request body is not valid JSON.`),
+- **500** `Something went wrong. Try again.` for everything else. The full error is logged on the server only.
+
+`router.param('id')` in `routes/climbingRoutes.js` answers 404 `Route not found.` for any `:id` that isn't a positive 32-bit integer, so `/routes/abc` is a 404 like any other missing route.
+
 ### Create and update are transactions
 
-`createRoute` and `updateRoute` take a dedicated client from the pool and wrap their writes in `BEGIN … COMMIT`:
+`createRoute` and `updateRoute` run their writes through `withTransaction` (`config/database.js`), which does `BEGIN`, runs the work on one pooled client, and then `COMMIT` (or `ROLLBACK` on any error):
 
-- **Create:** insert the `climbing_routes` row → insert all `route_holds` rows in one multi-row `INSERT` (`insertRouteHolds`) → commit → re-read the full route with `findRoute()` and return it.
-- **Update:** update the `climbing_routes` row (404 if it doesn't exist) → delete **all** that route's `route_holds` → reinsert the new set → commit → return the fresh route.
+- **Create:** find the wall type from the angle → insert the `climbing_routes` row → insert all `route_holds` rows in one multi-row `INSERT` (`insertRouteHolds`) → re-read the full route with `findRoute(client, id)` **before** the commit → return it with 201.
+- **Update:** find the wall type from the angle → update the `climbing_routes` row (404 if it doesn't exist) → delete **all** that route's `route_holds` → reinsert the new set → re-read the route inside the transaction → return it.
 
-So an update is always a **full replacement** of the route and its holds, even though the client sends it as `PATCH`.
+So an update is always a **full replacement** of the route and its holds.
 
 ## 5. Tracing a request end to end
 
@@ -180,7 +212,7 @@ So an update is always a **full replacement** of the route and its holds, even t
 ```
 App.jsx  fetchAll()
   ├─ api/routes.js     getRoutes()     → GET /api/routes      → SELECT_ROUTES … ORDER BY created_at DESC
-  ├─ api/options.js    getOptions()    → GET /api/options     → enum_range(...) for each enum + JS constants
+  ├─ api/options.js    getOptions()    → GET /api/options     → enum_range(...) for each enum + the rules in config/rules.js
   └─ api/wallTypes.js  getWallTypes()  → GET /api/wall-types  → SELECT … FROM wall_types
        │
        ├─ routes  → state, passed as props to RouteGalleryPage / RouteBuilderPage
@@ -194,15 +226,15 @@ App.jsx  fetchAll()
 RouteForm  (user clicks Save)
   → RouteBuilderPage.handleSave
   → App.saveRoute(route)                     (no id → create)
-  → api/routes.js createRoute → toApiRoute()  (camelCase client shape → API body)
+  → api/routes.js createRoute → toApiRoute()  (client shape → API body)
   → POST /api/routes
-  → validateRoute → wallTypeMatchesAngle → BEGIN / INSERT route / INSERT holds / COMMIT → findRoute
+  → validateRoute → findWallTypeId → BEGIN / INSERT route / INSERT holds / findRoute / COMMIT
   ← 201 + route JSON → toClientRoute()
   → App.refreshRoutes() (refetches the full list)
   → navigate to /routes/:id
 ```
 
-Editing follows the same path through `EditRoutePage`, with an `id` present, so `App.saveRoute` calls `updateRoute` (`PATCH`).
+Editing follows the same path through `EditRoutePage`, with an `id` present, so `App.saveRoute` calls `updateRoute` (`PUT`).
 
 ### Shape translation (client side)
 
@@ -210,14 +242,14 @@ The client never uses the raw API shape. `client/src/api/routes.js` converts in 
 
 | API | Client |
 |---|---|
-| `angle_degrees` | `angle` |
-| `wall_type_id` | `wallTypeId` |
-| `wall_type` (`"overhang"`) | `wallType` (`"Overhang"`, capitalized) |
+| `angleDegrees` | `angle` |
+| `wallType` (`"overhang"`) | `wallType` (`"Overhang"`, capitalized) |
+| `createdAt` | `createdAt` (the gallery sorts "Newest" by it) |
 | `gridRow` / `gridCol` | `row` / `col` |
-| `rotation` (any int) | `rotation` normalized to 0–359 |
-| `created_at`, `routeHoldId` | dropped |
+| `rotation` | `rotation` normalized to 0–359 |
+| `wallTypeId`, `routeHoldId` | dropped |
 
-`api/holds.js` and `api/options.js` do the same snake_case → camelCase mapping for their endpoints.
+`api/holds.js` and `api/options.js` pass the server's camelCase response straight through.
 
 ## 6. How the MVP user stories map to the backend
 
@@ -226,10 +258,10 @@ The client never uses the raw API shape. `client/src/api/routes.js` converts in 
 | 1 | Click holds to build a route | `GET /api/holds` (catalog) + `POST /api/routes` |
 | 2 | Mark start and finish holds | `hold_roles` enum, `route_holds.role` |
 | 3 | Name and grade | `climbing_routes.name`, `grades` enum |
-| 4 | Edit a saved route | `GET /api/routes/:id` + `PATCH /api/routes/:id` |
+| 4 | Edit a saved route | `GET /api/routes/:id` + `PUT /api/routes/:id` |
 | 5 | Delete a route | `DELETE /api/routes/:id` (holds cascade) |
 | 6 | Block saves without start/finish | `validateRoute()` + DB constraints |
-| 7 | Reset to starter routes | `POST /api/routes/reset` → `seedAllTables()` |
+| 7 | Reset to starter routes | `POST /api/routes/reset` → `seedStarterRoutes()` |
 | 8 | See all routes | `GET /api/routes` |
 | 9 | Filter by grade | Client-side filter on the full list |
 | 10 | Sort easiest → hardest | Client-side sort using the `grades` enum order from `/api/options` |
@@ -245,7 +277,7 @@ The client never uses the raw API shape. `client/src/api/routes.js` converts in 
 | `PORT` | `server/server.js` | API port, defaults to `3000` |
 | `VITE_API_URL` | `client/src/api/routes.js` | API base URL in production. Leave it unset in dev so the Vite proxy is used |
 
-The pool always connects with `ssl: { rejectUnauthorized: false }` (set up for Render's hosted Postgres).
+The pool always connects with `ssl: { rejectUnauthorized: false }`: the team's Postgres is hosted on Render, which requires SSL, so a local Postgres must have SSL enabled. `client/.env.example` documents `VITE_API_URL`.
 
 ---
 
@@ -335,7 +367,7 @@ App  (routes[], catalog, loading, error)
 
 ## 11. Shape translation and display
 
-`api/routes.js` converts API routes into the shape components use (`angle`, `wallTypeId`, `wallType` capitalized, holds with `row`/`col`, rotation normalized to 0–359) and back again. `created_at` and `routeHoldId` are dropped. Components never see the API's field names.
+`api/routes.js` converts API routes into the shape components use (`angle`, `wallType` capitalized, `createdAt`, holds with `row`/`col`, rotation normalized to 0–359) and back again. `wallTypeId` and `routeHoldId` are dropped. Components never see the API's field names.
 
 Display-only mappings live on the client:
 
@@ -353,7 +385,7 @@ Display-only mappings live on the client:
 3. a **blocked bolt**: an empty bolt where the hold being placed would overlap an existing one (editable mode only),
 4. an **empty bolt**.
 
-The covered/overlap rules use footprint circles from `holdFootprint.js`. **These rules exist only on the client.** The server only rejects two holds on the exact same bolt.
+The covered/overlap rules use footprint circles from `holdFootprint.js`. **These rules exist only on the client.** The server only rejects two holds on the exact same bolt. (The grid size, 16 × 12, is served by `/api/options`, but the client still hard-codes it until the frontend refactor.)
 
 ## 13. Frontend view of each user story
 
@@ -362,7 +394,7 @@ The covered/overlap rules use footprint circles from `holdFootprint.js`. **These
 | 1 | Click holds to build | `RouteForm.handleCellClick` → `WallComponent` (editable) + `ClimbingHoldsDrawer` |
 | 2 | Start/finish roles | Hold editor in `RouteForm` (role buttons from `catalog.holdRoles`, limited by `maxStartHolds`/`finishHolds`) |
 | 3 | Name and grade | `RouteForm` "Route details" panel (grades from `catalog.grades`) |
-| 4 | Edit | `EditRoutePage` → `useRoute` → `RouteForm existing` → `App.saveRoute` → PATCH |
+| 4 | Edit | `EditRoutePage` → `useRoute` → `RouteForm existing` → `App.saveRoute` → PUT |
 | 5 | Delete | `RouteDetailsPage` → `ConfirmDialog` → `App.deleteRoute` |
 | 6 | Save check | `RouteForm` checklist disables Save; server errors are shown in `form-error` |
 | 7 | Reset | `RouteGalleryPage` → `ConfirmDialog` → `App.resetRoutes` |
