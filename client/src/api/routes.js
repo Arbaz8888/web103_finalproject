@@ -7,7 +7,11 @@ export async function request(path, options = {}) {
     ...options,
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error ?? 'Something went wrong. Try again.')
+  if (!response.ok) {
+    const error = new Error(data.error ?? 'Something went wrong. Try again.')
+    error.status = response.status
+    throw error
+  }
   return data
 }
 
