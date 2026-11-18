@@ -36,3 +36,28 @@
     transform: rotate(360deg);
   }
 }
+/* Showcase variant: fills the hero stage with no border or background */
+.wall-3d.wall-3d-showcase {
+  aspect-ratio: auto;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  flex: 1;
+  -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
+  min-height: 520px;
+}
+.wall-3d-showcase canvas {
+  cursor: default;
+  pointer-events: none;
+}
+@media (max-width: 960px) {
+  .wall-3d.wall-3d-showcase {
+    min-height: 440px;
+  }
+}
+@media (max-width: 640px) {
+  .wall-3d.wall-3d-showcase {
+    min-height: 380px;
+  }
+}

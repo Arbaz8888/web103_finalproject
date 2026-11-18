@@ -77,20 +77,6 @@
   width: 60%;
   z-index: -1;
 }
-.wall-3d.wall-3d-showcase {
-  aspect-ratio: auto;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-  flex: 1;
-  -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
-  mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
-  min-height: 520px;
-}
-.wall-3d-showcase canvas {
-  cursor: default;
-  pointer-events: none;
-}
 .featured-chip {
   align-items: center;
   align-self: center;
@@ -142,8 +128,7 @@
     margin: 0 0 48px;
     min-height: 0;
   }
-  .hero-stage,
-  .wall-3d.wall-3d-showcase {
+  .hero-stage {
     min-height: 440px;
   }
 }
@@ -159,8 +144,7 @@
   .hero-stats dd {
     font-size: 1.4rem;
   }
-  .hero-stage,
-  .wall-3d.wall-3d-showcase {
+  .hero-stage {
     min-height: 380px;
   }
 }

@@ -1,3 +1,5 @@
+import './RouteGallery.css'
+
 function GallerySkeleton() {
   return (
     <div aria-busy="true" aria-label="Loading routes">

@@ -1,16 +1,4 @@
-/* 2D wall: T-nut bolt grid, placed holds with role glows, legend. Grid size from catalog via CSS variables. */
-.wall-stage {
-  background: radial-gradient(
-    120% 70% at 50% 0%,
-    #262c31,
-    var(--bg-raised) 70%
-  );
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  padding: 24px;
-  position: relative;
-}
+/* 2D wall: T-nut bolt grid, placed holds with role glows. Grid size from catalog via CSS variables. */
 .wall {
   aspect-ratio: var(--grid-cols) / var(--grid-rows);
   background-color: #c9c4b8;
@@ -154,27 +142,6 @@
 .wall-editable .wall-cell:hover .wall-hold-hit {
   z-index: 2;
 }
-.hold-legend {
-  color: var(--muted);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
-  gap: 18px;
-  justify-content: center;
-  margin-top: 18px;
-  text-transform: capitalize;
-}
-.hold-legend span {
-  align-items: center;
-  display: flex;
-  gap: 7px;
-}
-.legend-dot {
-  border-radius: 50%;
-  display: inline-block;
-  height: 9px;
-  width: 9px;
-}
 /* The hold being edited in the builder */
 .wall-editable .wall-cell-selected {
   z-index: 3;
@@ -197,8 +164,4 @@
     opacity: 0.55;
   }
 }
-@media (max-width: 640px) {
-  .wall-stage {
-    padding: 14px;
-  }
-}
+

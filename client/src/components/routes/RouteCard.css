@@ -1,9 +1,4 @@
 /* Gallery route cards: tilt toward the mouse, light follows the pointer, quick look button */
-.route-grid {
-  display: grid;
-  gap: 22px;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-}
 .route-card {
   animation: card-in 0.5s var(--ease-out) both;
   animation-delay: calc(var(--i, 0) * 45ms);
@@ -152,10 +147,6 @@
   }
 }
 @media (max-width: 640px) {
-  .route-grid {
-    gap: 12px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .route-card {
     border-radius: var(--radius);
   }

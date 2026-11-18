@@ -1,4 +1,5 @@
 import { useCatalog } from '../../hooks/useCatalog'
+import './HoldLegend.css'
 import { roleColor } from '../../utils/display'
 
 // Color key for hold roles; the roles themselves come from the backend

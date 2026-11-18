@@ -1,4 +1,5 @@
 import RouteCard from './RouteCard'
+import './RouteGallery.css'
 
 function RouteGallery({ routes, onQuickLook }) {
   return (
