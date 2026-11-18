@@ -1,7 +1,53 @@
 /* 2D / 3D pill switch */
-.view-toggle { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; display: inline-grid; grid-template-columns: 1fr 1fr; margin-bottom: 14px; padding: 3px; position: relative; }
-.view-toggle-thumb { background: var(--accent); border-radius: 999px; bottom: 3px; box-shadow: 0 4px 14px -4px rgba(255,107,44,.8); left: 3px; position: absolute; top: 3px; transition: transform .35s cubic-bezier(.3,1.4,.5,1); width: calc(50% - 3px); }
-.view-toggle-3d .view-toggle-thumb { transform: translateX(100%); }
-.view-toggle button { align-items: center; background: transparent; border: 0; border-radius: 999px; color: var(--muted); cursor: pointer; display: flex; font-family: 'DM Mono', monospace; font-weight: 500; gap: 7px; justify-content: center; padding: 7px 20px; position: relative; transition: color .25s; z-index: 1; }
-.view-toggle button[aria-pressed="true"] { color: #fff; }
-.view-toggle svg { fill: none; height: 16px; stroke: currentColor; stroke-linejoin: round; stroke-width: 1.8; width: 16px; }
+.view-toggle {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 14px;
+  padding: 3px;
+  position: relative;
+}
+.view-toggle-thumb {
+  background: var(--accent);
+  border-radius: 999px;
+  bottom: 3px;
+  box-shadow: 0 4px 14px -4px rgba(255, 107, 44, 0.8);
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  transition: transform 0.35s cubic-bezier(0.3, 1.4, 0.5, 1);
+  width: calc(50% - 3px);
+}
+.view-toggle-3d .view-toggle-thumb {
+  transform: translateX(100%);
+}
+.view-toggle button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  font-family: "DM Mono", monospace;
+  font-weight: 500;
+  gap: 7px;
+  justify-content: center;
+  padding: 7px 20px;
+  position: relative;
+  transition: color 0.25s;
+  z-index: 1;
+}
+.view-toggle button[aria-pressed="true"] {
+  color: #fff;
+}
+.view-toggle svg {
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 16px;
+}
