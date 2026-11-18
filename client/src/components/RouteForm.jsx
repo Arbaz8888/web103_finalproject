@@ -12,6 +12,7 @@ import { gradeTone, roleColor } from '../utils/display'
 import './RouteForm.css'
 
 const DEFAULT_ROLE = 'hand'
+const HISTORY_LIMIT = 50
 const isTyping = (target) => ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable
 const sameSpot = (a, b) => a && b && a.row === b.row && a.col === b.col
 
@@ -29,8 +30,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
   const [view, setView] = useState('2D')
   const wallRef = useRef(null)
   const drawerRef = useRef(null)
-  // True while the rotation knob is being dragged, so one drag is one undo step
-  const rotating = useRef(false)
+  const draggingRotation = useRef(false)
 
   const selectedHold = holds.find((hold) => sameSpot(hold, selectedCell))
   // One slider covers every wall type; the type follows from the angle
@@ -57,7 +57,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
 
   // Every change to the holds goes through here so it can be undone
   function commitHolds(next, { record = true } = {}) {
-    if (record) setHistory((past) => [...past.slice(-49), holds])
+    if (record) setHistory((past) => [...past.slice(-(HISTORY_LIMIT - 1)), holds])
     setHolds(next)
   }
 
@@ -105,9 +105,17 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     commitHolds(holds.map((hold) => (hold === selectedHold ? { ...hold, ...changes } : hold)), options)
   }
 
+  function handleRotationStart() {
+    draggingRotation.current = true
+    setHistory((past) => [...past.slice(-(HISTORY_LIMIT - 1)), holds])
+  }
+
   function setRotation(degrees) {
-    updateSelectedHold({ rotation: normalizeRotation(degrees) }, { record: !rotating.current })
-    rotating.current = true
+    updateSelectedHold({ rotation: normalizeRotation(degrees) }, { record: !draggingRotation.current })
+  }
+
+  function handleRotationEnd() {
+    draggingRotation.current = false
   }
 
   function removeHold() {
@@ -213,8 +221,9 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
                   <RotationDial
                     value={selectedHold.rotation}
                     imageUrl={selectedHold.imageUrl}
+                    onChangeStart={handleRotationStart}
                     onChange={setRotation}
-                    onChangeEnd={() => { rotating.current = false }}
+                    onChangeEnd={handleRotationEnd}
                   />
                 </div>
               </div>

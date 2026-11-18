@@ -4,8 +4,9 @@ import './RotationDial.css'
 
 // Knob for any rotation from 0 to 359°, plus a box to type an exact value.
 // 0° points up and angles go clockwise, matching CSS rotate() on the 2D wall.
-// onChange fires continuously while dragging; onChangeEnd fires once when the drag ends.
-function RotationDial({ value, onChange, onChangeEnd, imageUrl }) {
+// onChangeStart fires when a drag begins, onChange on every change, onChangeEnd when the drag ends.
+// Keyboard and typed changes only fire onChange.
+function RotationDial({ value, onChange, onChangeStart, onChangeEnd, imageUrl }) {
   const knob = useRef(null)
   const [dragging, setDragging] = useState(false)
   // What's typed in the box while editing; null shows the current value
@@ -23,6 +24,7 @@ function RotationDial({ value, onChange, onChangeEnd, imageUrl }) {
     knob.current.setPointerCapture(event.pointerId)
     knob.current.focus()
     setDragging(true)
+    onChangeStart?.()
     onChange(angleFromPointer(event))
   }
 
