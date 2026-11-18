@@ -20,15 +20,9 @@
 .wall-editable .wall-bolt { height: 20%; opacity: .6; width: 20%; }
 .wall-editable .wall-cell:hover .wall-bolt, .wall-editable .wall-cell:focus-visible .wall-bolt { box-shadow: 0 0 0 3px var(--accent); opacity: 1; transform: scale(1.5); }
 .wall-cell:focus-visible { outline: none; }
-.wall-hold { height: var(--hold-scale); max-width: none; object-fit: contain; pointer-events: none; position: absolute; transition: filter .15s, transform .15s; user-select: none; width: var(--hold-scale); z-index: 1; }
+.wall-hold { filter: drop-shadow(0 0 2px var(--role-color)) drop-shadow(0 0 4px var(--role-color)); height: var(--hold-scale); max-width: none; object-fit: contain; pointer-events: none; position: absolute; transition: filter .15s, transform .15s; user-select: none; width: var(--hold-scale); z-index: 1; }
 .wall-hold-hit { border-radius: 50%; height: calc(var(--hold-scale) * .8); position: absolute; width: calc(var(--hold-scale) * .8); z-index: 1; }
 .wall-editable .wall-cell:hover .wall-hold, .wall-editable .wall-cell:hover .wall-hold-hit { z-index: 2; }
-.wall-editable .wall-cell:hover .role-any, .wall-editable .wall-cell:focus-visible .role-any { filter: drop-shadow(0 0 3px var(--accent)); }
-.role-any { filter: drop-shadow(1px 2px 2px rgba(40,36,30,.55)); }
-.role-start { filter: drop-shadow(0 0 2px #eab308) drop-shadow(0 0 4px #eab308); }
-.role-hand { filter: drop-shadow(0 0 2px #3b82f6) drop-shadow(0 0 4px #3b82f6); }
-.role-foot { filter: drop-shadow(0 0 2px #16a34a) drop-shadow(0 0 4px #16a34a); }
-.role-finish { filter: drop-shadow(0 0 2px #dc2626) drop-shadow(0 0 4px #dc2626); }
 .hold-legend { color: var(--muted); display: flex; flex-wrap: wrap; font-size: .8rem; gap: 18px; justify-content: center; margin-top: 18px; text-transform: capitalize; }
 .hold-legend span { align-items: center; display: flex; gap: 7px; }
 .legend-dot { border-radius: 50%; display: inline-block; height: 9px; width: 9px; }

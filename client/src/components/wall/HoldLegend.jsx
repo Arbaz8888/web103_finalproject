@@ -8,7 +8,7 @@ function HoldLegend() {
     <div className="hold-legend" aria-label="Hold colors">
       {holdRoles.map((role) => (
         <span key={role}>
-          <i className={`legend-dot ${role}`} style={{ background: roleColor(role) }} />
+          <i className="legend-dot" style={{ background: roleColor(role) }} />
           {role}
         </span>
       ))}
