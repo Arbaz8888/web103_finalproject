@@ -12,3 +12,20 @@ const config = {
 };
 
 export const pool = new pg.Pool(config);
+
+// Runs work(client) inside BEGIN/COMMIT on one pooled connection.
+// Any thrown error rolls everything back and is rethrown to the caller.
+export const withTransaction = async (work) => {
+	const client = await pool.connect();
+	try {
+		await client.query('BEGIN');
+		const result = await work(client);
+		await client.query('COMMIT');
+		return result;
+	} catch (error) {
+		await client.query('ROLLBACK').catch(() => {});
+		throw error;
+	} finally {
+		client.release();
+	}
+};

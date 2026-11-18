@@ -1,5 +1,6 @@
-import { pool } from '../config/database.js';
-import { seedAllTables } from '../config/reset.js';
+import { pool, withTransaction } from '../config/database.js';
+import { createSchema } from '../db/schema.js';
+import { seedReferenceData, seedStarterRoutes } from '../db/seed.js';
 import { FINISH_HOLDS, MAX_ROTATION, MAX_START_HOLDS, MIN_START_HOLDS } from '../config/rules.js';
 
 // Each route comes back with its wall type and an array of its placed holds
@@ -207,7 +208,11 @@ const deleteRoute = async (req, res) => {
 
 const resetRoutes = async (req, res) => {
 	try {
-		await seedAllTables();
+		await withTransaction(async (client) => {
+			await createSchema(client);
+			await seedReferenceData(client);
+			await seedStarterRoutes(client);
+		});
 		res.status(200).json({ message: 'Wall reset to starter routes.' });
 	} catch (error) {
 		sendError(res, error);
