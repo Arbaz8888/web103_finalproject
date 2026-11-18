@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { APP_TAGLINE } from '../config/app'
 import RouteFilters from '../components/routes/RouteFilters'
 import QuickLookModal from '../components/routes/QuickLookModal'
 import RouteGallery from '../components/routes/RouteGallery'
@@ -68,7 +69,7 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
     <>
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">BOULDERING ROUTE BUILDER</p>
+          <p className="eyebrow">{APP_TAGLINE.toUpperCase()}</p>
           <h1>Build bouldering routes on a <span className="accent-text">virtual wall.</span></h1>
           <p className="lede">Pick holds, place them on a {gridCols} × {gridRows} bolt grid, mark the start and finish, and set the wall angle. Sketch a route here before you set it on a real wall.</p>
           <div className="hero-actions">

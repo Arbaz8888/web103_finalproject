@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { APP_NAME, APP_TAGLINE } from './config/app'
 import Navbar from './components/layout/Navbar'
 import ToastProvider from './components/ui/ToastProvider'
 import CatalogProvider from './components/providers/CatalogProvider'
@@ -84,8 +85,8 @@ function App() {
           </CatalogProvider>
         </main>
         <footer className="site-footer">
-          <span><span className="brand-mark" aria-hidden="true">◈</span> Crux Maker</span>
-          <span>Build bouldering routes on a virtual wall.</span>
+          <span><span className="brand-mark" aria-hidden="true">◈</span> {APP_NAME}</span>
+          <span>{APP_TAGLINE}.</span>
         </footer>
       </ToastProvider>
     </BrowserRouter>
