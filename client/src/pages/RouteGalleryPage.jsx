@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import GradeFilter from '../components/GradeFilter'
-import QuickLookModal from '../components/QuickLookModal'
-import RouteGallery from '../components/RouteGallery'
+import { APP_TAGLINE } from '../config/app'
+import RouteFilters from '../components/routes/RouteFilters'
+import QuickLookModal from '../components/routes/QuickLookModal'
+import RouteGallery from '../components/routes/RouteGallery'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import GradeBadge from '../components/GradeBadge'
-import Wall3DLazy from '../components/Wall3DLazy'
+import GradeBadge from '../components/routes/GradeBadge'
+import GallerySkeleton from '../components/routes/GallerySkeleton'
+import HeroWall from '../components/wall/HeroWall'
 import { useCatalog } from '../hooks/useCatalog'
 import { useToast } from '../hooks/useToast'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -13,10 +15,10 @@ import './RouteGalleryPage.css'
 
 const EMPTY_FILTERS = { query: '', grade: '', wallType: '', sort: 'newest' }
 
-function RouteGalleryPage({ routes, onReset }) {
+function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
   usePageTitle('Route gallery')
   const toast = useToast()
-  const { grades } = useCatalog()
+  const { grades, gridRows, gridCols } = useCatalog()
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [previewRoute, setPreviewRoute] = useState(null)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -45,13 +47,22 @@ function RouteGalleryPage({ routes, onReset }) {
     }
   }, [grades, routes])
 
-  // The busiest route makes the best-looking homepage wall
-  const featured = useMemo(() => routes.reduce((best, route) => (!best || route.holds.length > best.holds.length ? route : best), null), [routes])
+  // Route of the day: rotates through the routes (by id) once per local day, so it stays
+  // stable while browsing and changes tomorrow
+  const featured = useMemo(() => {
+    if (routes.length === 0) return null
+    const today = new Date()
+    const day = Math.floor(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) / 86400000)
+    return [...routes].sort((a, b) => a.id - b.id)[day % routes.length]
+  }, [routes])
+
+  // Clears search, grade and wall type; the sort is a view preference and stays
+  const clearFilters = () => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))
 
   async function handleReset() {
     try {
       await onReset()
-      setFilters(EMPTY_FILTERS)
+      clearFilters()
       toast('Wall reset to the starter routes')
     } catch (err) {
       toast(err.message, 'error')
@@ -64,9 +75,9 @@ function RouteGalleryPage({ routes, onReset }) {
     <>
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">BOULDERING ROUTE BUILDER</p>
+          <p className="eyebrow">{APP_TAGLINE.toUpperCase()}</p>
           <h1>Build bouldering routes on a <span className="accent-text">virtual wall.</span></h1>
-          <p className="lede">Pick holds, place them on a 12 × 16 bolt grid, mark the start and finish, and set the wall angle. Sketch a route here before you set it on a real wall.</p>
+          <p className="lede">Pick holds, place them on a {gridCols} × {gridRows} bolt grid, mark the start and finish, and set the wall angle. Sketch a route here before you set it on a real wall.</p>
           <div className="hero-actions">
             <Link className="button button-primary button-lg" to="/routes/new">＋ Build a route</Link>
             <a className="button button-ghost button-lg" href="#routes">See saved routes ↓</a>
@@ -81,7 +92,7 @@ function RouteGalleryPage({ routes, onReset }) {
         <div className="hero-stage">
           {featured ? (
             <>
-              <Wall3DLazy key={featured.id} holds={featured.holds} angle={featured.angle} wallType={featured.wallType} showcase fallbackClassName="wall-3d-showcase" />
+              <HeroWall route={featured} />
               <Link className="featured-chip" to={`/routes/${featured.id}`}>
                 <span className="featured-label">Featured route</span>
                 <strong>{featured.name}</strong>
@@ -105,9 +116,17 @@ function RouteGalleryPage({ routes, onReset }) {
         </button>
       </div>
 
-      <GradeFilter routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))} />
+      <RouteFilters routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={clearFilters} />
 
-      {routes.length === 0 ? (
+      {status === 'loading' ? (
+        <GallerySkeleton />
+      ) : status === 'error' ? (
+        <section className="empty-panel" role="alert">
+          <h3>Couldn't load routes.</h3>
+          <p className="muted">{error}</p>
+          <button className="button button-primary" type="button" onClick={onRetry}>Try again</button>
+        </section>
+      ) : routes.length === 0 ? (
         <section className="empty-panel">
           <h3>No routes yet.</h3>
           <p className="muted">Build the first route, or reset the wall to bring back the starter routes.</p>
@@ -117,7 +136,7 @@ function RouteGalleryPage({ routes, onReset }) {
         <section className="empty-panel">
           <h3>No routes match.</h3>
           <p className="muted">Try a different grade or wall type, or clear your filters.</p>
-          <button className="button button-ghost" type="button" onClick={() => setFilters(EMPTY_FILTERS)}>Clear filters</button>
+          <button className="button button-ghost" type="button" onClick={clearFilters}>Clear filters</button>
         </section>
       ) : (
         <RouteGallery routes={visibleRoutes} onQuickLook={setPreviewRoute} />

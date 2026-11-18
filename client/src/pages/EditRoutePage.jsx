@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import RouteForm from '../components/RouteForm'
+import RouteForm from '../components/builder/RouteForm'
 import NotFoundPage from './NotFoundPage'
 import { useRoute } from '../hooks/useRoute'
 import { useToast } from '../hooks/useToast'
@@ -9,12 +9,19 @@ function EditRoutePage({ onSave }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
-  const { status, route, error } = useRoute(id)
+  const { status, route, error, retry } = useRoute(id)
   usePageTitle(route ? `Edit ${route.name}` : status === 'loading' ? 'Loading route' : 'Route not found')
 
   if (status === 'loading') return <div className="skeleton skeleton-details" aria-busy="true" aria-label="Loading route" />
   if (status === 'missing') return <NotFoundPage message="That route doesn't exist, or it was deleted." />
-  if (status === 'error') return <p className="form-error" role="alert">Could not load this route: {error}</p>
+  if (status === 'error') return (
+    <section className="empty-state" role="alert">
+      <p className="eyebrow">ERROR</p>
+      <h1>Couldn't load this route.</h1>
+      <p className="lede">{error}</p>
+      <button className="button button-primary" type="button" onClick={retry}>Try again</button>
+    </section>
+  )
 
   async function handleSave(updatedRoute) {
     await onSave(updatedRoute)

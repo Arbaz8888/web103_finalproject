@@ -1,0 +1,38 @@
+/* Gallery search, grade/wall chips and sort */
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.filters-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.search {
+  align-items: center;
+  display: flex;
+  flex: 1 1 280px;
+  position: relative;
+}
+.search svg {
+  color: var(--faint);
+  left: 15px;
+  pointer-events: none;
+  position: absolute;
+}
+.search input {
+  border-radius: 999px;
+  padding-left: 42px;
+}
+@media (max-width: 640px) {
+  .filters-row .segmented {
+    width: 100%;
+  }
+  .filters-row .segmented button {
+    flex: 1;
+    justify-content: center;
+  }
+}

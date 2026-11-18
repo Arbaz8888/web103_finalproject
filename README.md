@@ -1,6 +1,6 @@
-# Custom Climbing Route Maker
+# BetaSpray
 
-CodePath WEB103 Final Project
+A virtual spray wall. CodePath WEB103 Final Project (Custom Climbing Route Maker).
 
 Designed and developed by: Isaiah Linares, Francisco Burgos, Abha Mam, Han Luu, Arbaaz Attar
 
@@ -8,7 +8,7 @@ Designed and developed by: Isaiah Linares, Francisco Burgos, Abha Mam, Han Luu, 
 
 ### Description and Purpose
 
-Custom Climbing Route Maker lets you build your own bouldering routes on a virtual climbing wall. You pick the holds, mark where the route starts and finishes, give it a name and a grade, and save it. Other climbers can browse the routes, filter them by how hard they are, and try them at their own gym.
+BetaSpray lets you build your own bouldering routes on a virtual climbing wall. You pick the holds, mark where the route starts and finishes, give it a name and a grade, and save it. Other climbers can browse the routes, filter them by how hard they are, and try them at their own gym.
 
 We made it for two kinds of people: climbers who want new problems to try, and route setters who want a quick way to sketch out an idea before putting real holds on a real wall.
 

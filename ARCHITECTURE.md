@@ -2,7 +2,7 @@
 
 This document explains how Custom Climbing Route Maker is put together. It's for teammates (and future us) who need to find their way around the code.
 
-> **Scope:** Sections 1–7 cover the **backend** (`/server`) and the API contract. Sections 8–13 cover the **frontend** (`/client`). The backend sections describe the code **after** the refactor in `backend-refactor-plan.md`. The frontend sections are still the pre-refactor frontend (see `frontend-refactor-plan.md`), except where they touch the API contract.
+> **Scope:** Sections 1–7 cover the **backend** (`/server`) and the API contract. Sections 8–13 cover the **frontend** (`/client`). Both the backend and frontend describe the code **after** their respective refactor plans.
 
 ---
 
@@ -210,14 +210,17 @@ So an update is always a **full replacement** of the route and its holds.
 ### Loading the app
 
 ```
-App.jsx  fetchAll()
-  ├─ api/routes.js     getRoutes()     → GET /api/routes      → SELECT_ROUTES … ORDER BY created_at DESC
-  ├─ api/options.js    getOptions()    → GET /api/options     → enum_range(...) for each enum + the rules in config/rules.js
-  └─ api/wallTypes.js  getWallTypes()  → GET /api/wall-types  → SELECT … FROM wall_types
-       │
-       ├─ routes  → state, passed as props to RouteGalleryPage / RouteBuilderPage
-       └─ options + wallTypes → CatalogContext (read with useCatalog() by RouteForm, GradeFilter,
-                                 GradeBadge, Hold legend, ClimbingHoldsDrawer, Wall3DComponent)
+App.jsx
+  └─ useRouteList  → GET /api/routes  → SELECT_ROUTES … ORDER BY created_at DESC
+       routes → props to RouteGalleryPage / RouteBuilderPage; count to Navbar
+
+CatalogProvider  (mounts inside App, wraps all pages)
+  └─ Promise.all([getOptions(), getWallTypes(), getHolds()])
+       ├─ GET /api/options     → enum_range(...) for each enum + rules.js values
+       ├─ GET /api/wall-types  → SELECT … FROM wall_types
+       └─ GET /api/holds       → SELECT … FROM climbing_holds
+            → CatalogContext (read with useCatalog() by RouteForm, RouteFilters,
+                               GradeBadge, HoldLegend, ClimbingHoldsDrawer, Wall3DComponent)
 ```
 
 ### Saving a new route
@@ -225,31 +228,22 @@ App.jsx  fetchAll()
 ```
 RouteForm  (user clicks Save)
   → RouteBuilderPage.handleSave
-  → App.saveRoute(route)                     (no id → create)
-  → api/routes.js createRoute → toApiRoute()  (client shape → API body)
+  → App.saveRoute(route)                       (no id → create)
+  → api/routes.js createRoute → toApiRoute()   (strips display-only fields, keeps API names)
   → POST /api/routes
   → validateRoute → findWallTypeId → BEGIN / INSERT route / INSERT holds / findRoute / COMMIT
-  ← 201 + route JSON → toClientRoute()
-  → App.refreshRoutes() (refetches the full list)
+  ← 201 + route JSON  (raw API shape, used directly)
+  → App.setRoutes(current => [saved, ...current])  (local prepend, no refetch)
   → navigate to /routes/:id
 ```
 
-Editing follows the same path through `EditRoutePage`, with an `id` present, so `App.saveRoute` calls `updateRoute` (`PUT`).
+Editing follows the same path through `EditRoutePage`, with an `id` present, so `App.saveRoute` calls `updateRoute` (`PUT`) and replaces the matching entry in the list.
 
 ### Shape translation (client side)
 
-The client never uses the raw API shape. `client/src/api/routes.js` converts in both directions:
+Components use the API's own field names directly: `angleDegrees`, `gridRow`, `gridCol`, `wallType` (lowercase). `toApiRoute()` strips display-only fields (`imageUrl`, `size`, `holdType`, `color`, `wallTypeId`, `wallType`, `createdAt`) from hold objects before the body is sent; it doesn't rename any keys. `formatLabel()` in `utils/format.js` capitalizes enum values for display (`"overhang"` → `"Overhang"`).
 
-| API | Client |
-|---|---|
-| `angleDegrees` | `angle` |
-| `wallType` (`"overhang"`) | `wallType` (`"Overhang"`, capitalized) |
-| `createdAt` | `createdAt` (the gallery sorts "Newest" by it) |
-| `gridRow` / `gridCol` | `row` / `col` |
-| `rotation` | `rotation` normalized to 0–359 |
-| `wallTypeId`, `routeHoldId` | dropped |
-
-`api/holds.js` and `api/options.js` pass the server's camelCase response straight through.
+`api/holds.js`, `api/options.js` and `api/wallTypes.js` pass the server's camelCase response straight through.
 
 ## 6. How the MVP user stories map to the backend
 
@@ -285,107 +279,143 @@ The pool always connects with `ssl: { rejectUnauthorized: false }`: the team's P
 
 ## 8. Frontend stack and layout
 
-React 19 + Vite, React Router, and three.js (through `@react-three/fiber`, `drei` and `postprocessing`) for the 3D wall. There's no state library: shared data lives in `App.jsx` and in two React contexts. Plain CSS sits next to each component, and the design tokens live in `src/index.css`.
+BetaSpray's frontend is React 19 + Vite, React Router, and three.js (through `@react-three/fiber`, `drei` and `postprocessing`) for the 3D wall. There's no state library: shared data lives in `App.jsx` and in React contexts. Plain CSS sits next to each component; design tokens live in `styles/theme.css`.
 
 ```
 client/src/
 ├── main.jsx                 Mounts <App/> in StrictMode, loads global CSS
-├── App.jsx                  Loads data, owns the route list, defines the pages, provides contexts
+├── App.jsx                  Owns the route list (useRouteList), mutations, and the page tree
+├── config/
+│   └── app.js               APP_NAME = 'BetaSpray' and APP_TAGLINE
 ├── api/                     The only code that calls fetch()
-│   ├── routes.js            request() helper + route CRUD + shape mappers (+ capitalize, normalizeRotation)
+│   ├── client.js            request() helper + API_URL (re-exported from routes.js)
+│   ├── routes.js            Route CRUD; toApiRoute() strips display-only fields before sending
 │   ├── holds.js             GET /holds
 │   ├── options.js           GET /options
 │   └── wallTypes.js         GET /wall-types
 ├── hooks/
-│   ├── useCatalog.js        CatalogContext: everything the backend allows (grades, roles, wall types, …)
-│   ├── useRoute.js          Fetch one route by id, with a loading/ready/missing/error status
+│   ├── useCatalog.js        CatalogContext + useCatalog()
+│   ├── useRoute.js          Fetch one route by id, with loading/ready/missing/error status
+│   ├── useRouteList.js      Fetch + manage the gallery route list; local updates after mutations
 │   ├── useToast.js          ToastContext: toast(message, tone)
-│   ├── usePageTitle.js      Sets document.title
+│   ├── usePageTitle.js      Sets document.title (uses APP_NAME)
 │   └── usePointerGlow.js    Cursor spotlight effect (purely visual)
 ├── pages/                   One component per URL
 │   ├── RouteGalleryPage     /                 hero + 3D showcase, filters, cards, quick look, reset
-│   ├── RouteBuilderPage     /routes/new       wraps RouteForm, plus "open a random route"
+│   ├── RouteBuilderPage     /routes/new       wraps RouteForm
 │   ├── RouteDetailsPage     /routes/:id       2D/3D wall, share, delete
 │   ├── EditRoutePage        /routes/:id/edit  wraps RouteForm with an existing route
 │   └── NotFoundPage         *
 ├── components/
-│   ├── RouteForm            The builder: wall editing, undo, hold editor, details, save checklist
-│   ├── WallComponent        2D bolt grid (read-only or editable), with footprint/overlap logic
-│   ├── Wall3DLazy           Lazy-loads Wall3DComponent (three.js is ~1.3 MB)
-│   ├── Wall3DComponent      3D gym scene: tilted board, photo-relief holds, camera, role highlights
-│   ├── ClimbingHoldsDrawer  Hold catalog picker (fetches /holds itself)
-│   ├── RotationDial         Rotation knob + number input
-│   ├── GradeFilter          Search + grade chips + wall-type chips + sort (the whole filter bar)
-│   ├── RouteGallery, RouteCard, QuickLookModal, GradeBadge, AngleGlyph, ViewToggle, Navbar
-│   ├── Hold.jsx             Exports HoldLegend (the role color key)
-│   └── ui/                  Dialog (native <dialog>), ConfirmDialog, ToastProvider
+│   ├── builder/
+│   │   ├── RouteForm          The builder: wall editing, hold editor, details, save checklist
+│   │   ├── ClimbingHoldsDrawer  Hold catalog picker
+│   │   ├── RotationDial       Rotation knob + number input
+│   │   ├── useHoldHistory.js  Undo stack (last 50 hold arrays)
+│   │   └── useBuilderShortcuts.js  Keyboard shortcuts (Ctrl+Z, Delete, R, Escape)
+│   ├── layout/
+│   │   └── Navbar             Brand, nav links, route count
+│   ├── routes/
+│   │   ├── RouteGallery + RouteGallery.css   Responsive card grid
+│   │   ├── RouteCard          Tilt/glow card, quick look button
+│   │   ├── RouteFilters       Search + grade chips + wall-type chips + sort
+│   │   ├── GradeBadge         Coloured grade pill
+│   │   ├── QuickLookModal     Detail overlay
+│   │   └── GallerySkeleton    Loading skeleton (uses RouteGallery.css)
+│   ├── wall/
+│   │   ├── WallComponent + WallComponent.css  2D bolt grid
+│   │   ├── HoldLegend + HoldLegend.css        Role color key
+│   │   ├── Wall3DLazy + Wall3DLazy.css        Lazy wrapper + showcase styles
+│   │   ├── HeroWall                           Homepage hero: idle-loaded 3D, 2D fallback
+│   │   ├── three/                             3D wall: Wall3DComponent (entry), Scene, WallBoard,
+│   │   │                                      Hold3D, CameraRig, sceneLayout.js, hold3d.js
+│   │   ├── AngleGlyph                         Angle diagram SVG
+│   │   └── ViewToggle                         2D / 3D segmented control
+│   ├── providers/
+│   │   └── CatalogProvider    Loads options + wall types + holds; shows skeleton/error until ready
+│   └── ui/
+│       ├── Dialog, ConfirmDialog  Native <dialog> wrappers
+│       └── ToastProvider          Toast stack
 ├── utils/
-│   ├── display.js           Role colors, grade "tone" bands
-│   ├── holdFootprint.js     Hold size → drawn scale, footprint radius, covered/overlapping bolts
-│   └── hold3d.js            Procedural geometry, canvas textures, photo-relief builder for 3D holds
-└── styles/base.css, index.css
+│   ├── display.js           ROLE_COLORS, roleColor(), describeRole(), gradeTone()
+│   ├── format.js            formatLabel() — capitalize a backend enum value for display
+│   ├── rotation.js          normalizeRotation(degrees, maxRotation)
+│   ├── holdFootprint.js     Hold scale, footprint radius, covered/overlapping bolts
+│   └── webgl.js             supportsWebGL()
+└── styles/
+    ├── base.css              Shared layout, type, buttons, .wall-stage
+    ├── theme.css             Design tokens (CSS custom properties)
+    └── index.css             Imports theme and base; loaded globally
 ```
 
 ## 9. Component tree and who owns what state
 
 ```
-App  (routes[], catalog, loading, error)
-├── CatalogContext.Provider  value = { grades, holdRoles, holdTypes, holdSizes, maxStartHolds, finishHolds, wallTypes }
-│   └── ToastProvider  (toast stack)
-│       ├── Navbar  (routeCount)
-│       └── <Routes>
-│           ├── RouteGalleryPage  props: routes, onReset          state: filters, previewRoute, confirmReset
-│           │   ├── Wall3DLazy (showcase of the route with the most holds)
-│           │   ├── GradeFilter → RouteGallery → RouteCard → WallComponent (sm)
-│           │   ├── QuickLookModal → Dialog → WallComponent
-│           │   └── ConfirmDialog (reset)
-│           ├── RouteBuilderPage  props: routes, onSave
-│           │   └── RouteForm (new)
-│           ├── RouteDetailsPage  props: onDelete                 useRoute(id); state: view, confirmDelete
-│           │   ├── WallComponent (lg) + HoldLegend   or   Wall3DLazy
-│           │   └── ConfirmDialog (delete)
-│           ├── EditRoutePage     props: onSave                   useRoute(id)
-│           │   └── RouteForm (existing)
-│           └── NotFoundPage
+App  (useRouteList: status, routes[], reload, setRoutes)
+└── ToastProvider  (toast stack)
+    ├── Navbar  (routeCount)
+    └── <Routes>
+        └── CatalogProvider  (options + wallTypes + holds → CatalogContext)
+            ├── RouteGalleryPage  props: routes, status, error, onRetry, onReset
+            │                     state: filters, previewRoute, confirmReset
+            │   ├── HeroWall (route of the day: 3D when idle, else 2D)
+            │   ├── RouteFilters → RouteGallery → RouteCard → WallComponent (sm)
+            │   ├── QuickLookModal → Dialog → WallComponent
+            │   └── ConfirmDialog (reset)
+            ├── RouteBuilderPage  props: routes, onSave
+            │   └── RouteForm (new)   state: name, grade, angleDegrees, holds[], selectedCell,
+            │                               pickedHold, view, error, saving
+            │                         hooks: useHoldHistory (undo stack), useBuilderShortcuts
+            ├── RouteDetailsPage  props: onDelete            useRoute(id); state: view, confirmDelete
+            │   ├── WallComponent (lg) + HoldLegend   or   Wall3DLazy
+            │   └── ConfirmDialog (delete)
+            ├── EditRoutePage     props: onSave              useRoute(id)
+            │   └── RouteForm (existing)
+            └── NotFoundPage
 ```
 
-**RouteForm** owns all of the editing state: `name`, `grade`, `angle`, `holds[]`, an undo `history` (last 50 hold arrays), `selectedCell`, the picked catalog hold, `view` (2D/3D), `error` and `saving`. It derives the wall type from the angle using `catalog.wallTypes`, and it mirrors the server's save check using `maxStartHolds` and `finishHolds`.
+**RouteForm** owns all editing state. It reads all limits (`maxStartHolds`, `finishHolds`, `maxNameLength`, `maxRotation`, `defaultHoldRole`) from `useCatalog()` and derives the wall type from `angleDegrees` using `catalog.wallTypes`.
 
 ## 10. How the frontend gets its data
 
 | Data | Fetched by | When | Kept in | Read by |
 |---|---|---|---|---|
-| Route list | `App.fetchAll` → `api.getRoutes` | App start, and after every save/delete/reset (`refreshRoutes`) | `App` state | Gallery, Builder (random route), Navbar count |
-| Options (enums + limits) | `App.fetchAll` → `getOptions` | App start | `CatalogContext` | RouteForm, GradeFilter, GradeBadge, HoldLegend, Drawer, Wall3D, Gallery sort |
-| Wall types | `App.fetchAll` → `getWallTypes` | App start | `CatalogContext` | RouteForm (slider range and type), GradeFilter |
-| Hold catalog | `ClimbingHoldsDrawer` → `fetchHolds` | Every time a RouteForm mounts | Drawer local state | Drawer only |
-| One route | `useRoute(id)` → `getRoute` | Whenever the details or edit page opens | Hook state | Details page, Edit page |
+| Route list | `useRouteList` → `api.getRoutes` | App start + on `reload()` after reset | `useRouteList` state | Gallery, Builder (random route), Navbar count |
+| Options (enums + limits) | `CatalogProvider` → `getOptions` | App start | `CatalogContext` | RouteForm, RouteFilters, GradeBadge, HoldLegend, Drawer, Wall3D, Gallery sort |
+| Wall types | `CatalogProvider` → `getWallTypes` | App start | `CatalogContext` | RouteForm (slider), RouteFilters |
+| Hold catalog | `CatalogProvider` → `getHolds` | App start | `CatalogContext` | `ClimbingHoldsDrawer` |
+| One route | `useRoute(id)` → `getRoute` | Details or edit page opens | Hook state | Details page, Edit page |
 
-- The app shows a skeleton until all three startup requests finish. If **any** of them fails, every page is replaced by an error screen with a retry button.
-- Quick Look and the gallery cards reuse the list data, so they make no extra requests.
-- **Mutations** go through `App`: `saveRoute` (create or update), `deleteRoute` and `resetRoutes`. Each one calls the API and then **refetches the whole list**; nothing is patched locally. Errors are thrown back to the page, which shows them in the form or as a toast.
+- **Catalog** (`CatalogProvider`): all three requests run in `Promise.all`. Until they all succeed, `CatalogProvider` shows a full-page skeleton. On error it shows a retry screen. `ClimbingHoldsDrawer` reads holds straight from the catalog; it no longer fetches them itself.
+- **Route list** (`useRouteList`): after `saveRoute` (create/update) or `deleteRoute`, the list is **updated locally** (`setRoutes`). After `resetRoutes` only, `reload()` is called because the full list changes.
+- Quick Look and gallery cards reuse the list data — no extra requests.
+- Errors from mutations are thrown back to the caller (shown in the form or as a toast).
 
 ## 11. Shape translation and display
 
-`api/routes.js` converts API routes into the shape components use (`angle`, `wallType` capitalized, `createdAt`, holds with `row`/`col`, rotation normalized to 0–359) and back again. `wallTypeId` and `routeHoldId` are dropped. Components never see the API's field names.
+`getRoutes()` and `getRoute()` return the raw API shape. Components use the API's own field names throughout: `angleDegrees`, `gridRow`, `gridCol`, `wallType` (lowercase). There is no `toClientRoute` transformation.
 
-Display-only mappings live on the client:
+`toApiRoute()` in `api/routes.js` strips display-only fields (`imageUrl`, `size`, `holdType`, `color`, `wallTypeId`, `wallType`, `createdAt`) before the body is sent to the server.
 
-- **Role colors:** `utils/display.js` `ROLE_COLORS` (JS) and `.role-*` rules in `WallComponent.css` (CSS).
+Display-only mappings on the client:
+
+- **Enum labels:** `formatLabel(value)` in `utils/format.js` capitalizes the first letter of a backend enum value for display.
+- **Role colors:** `ROLE_COLORS` in `utils/display.js`. `WallComponent` applies them via the `--role-color` CSS variable on each `.wall-hold` element (glow `drop-shadow`). `HoldLegend` reads them through `roleColor()`. No `.role-*` CSS classes.
 - **Grade tones:** `gradeTone()` splits the backend's grade list into easy/moderate/hard/elite by position.
 - **Hold size → drawn scale:** `HOLD_SCALE` in `utils/holdFootprint.js` (small 0.8, medium 1.6, large 2.4 bolt cells).
-- **3D relief depth per hold type:** `RELIEF_DEPTH` in `Wall3DComponent.jsx`.
+- **3D relief depth per hold type:** `RELIEF_DEPTH` in `three/Hold3D.jsx`.
+- **Rotation normalization:** `normalizeRotation(degrees, maxRotation)` in `utils/rotation.js`; `maxRotation` comes from the catalog.
 
 ## 12. The 2D wall and placement rules
 
-`WallComponent` draws a 16-row × 12-column CSS grid. Each cell is one of:
+`WallComponent` draws a CSS grid sized by `--grid-rows` and `--grid-cols` CSS variables (set from `useCatalog()`). Each cell is one of:
 
 1. a **placed hold**: a button when editable, otherwise an image,
 2. a **covered bolt**: hidden under a larger neighboring hold; clicking it selects that hold,
 3. a **blocked bolt**: an empty bolt where the hold being placed would overlap an existing one (editable mode only),
 4. an **empty bolt**.
 
-The covered/overlap rules use footprint circles from `holdFootprint.js`. **These rules exist only on the client.** The server only rejects two holds on the exact same bolt. (The grid size, 16 × 12, is served by `/api/options`, but the client still hard-codes it until the frontend refactor.)
+The covered/overlap rules use footprint circles from `holdFootprint.js`. **These rules are a client-side placement aid only.** The server rejects two holds on the exact same bolt, but does not enforce footprint circles. The starter routes satisfy the client rule.
 
 ## 13. Frontend view of each user story
 
@@ -399,8 +429,8 @@ The covered/overlap rules use footprint circles from `holdFootprint.js`. **These
 | 6 | Save check | `RouteForm` checklist disables Save; server errors are shown in `form-error` |
 | 7 | Reset | `RouteGalleryPage` → `ConfirmDialog` → `App.resetRoutes` |
 | 8 | All routes | `RouteGalleryPage` → `RouteGallery` → `RouteCard` |
-| 9 | Filter by grade | `GradeFilter` chips → `filters.grade` in `RouteGalleryPage.visibleRoutes` |
-| 10 | Sort by difficulty | `filters.sort` sorts by index in `catalog.grades` |
+| 9 | Filter by grade | `RouteFilters` chips → `filters.grade` in `RouteGalleryPage.visibleRoutes` |
+| 10 | Sort by difficulty | `filters.sort` sorts by index in `catalog.grades` (sort preference kept on filter clear) |
 | 11 | Route page | `/routes/:id` → `RouteDetailsPage` |
 | 12 | Share link | `RouteDetailsPage.handleShare` (Web Share API on touch devices, otherwise copy to clipboard) |
 | 13 | Quick look | `RouteCard` eye button → `QuickLookModal` |

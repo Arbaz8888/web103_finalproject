@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
-import Navbar from './components/Navbar'
+import { APP_NAME, APP_TAGLINE } from './config/app'
+import Navbar from './components/layout/Navbar'
 import ToastProvider from './components/ui/ToastProvider'
+import CatalogProvider from './components/providers/CatalogProvider'
 import * as api from './api/routes'
-import { getOptions } from './api/options'
-import { getWallTypes } from './api/wallTypes'
-import { CatalogContext } from './hooks/useCatalog'
+import { useRouteList } from './hooks/useRouteList'
 import EditRoutePage from './pages/EditRoutePage'
 import RouteBuilderPage from './pages/RouteBuilderPage'
 import RouteDetailsPage from './pages/RouteDetailsPage'
@@ -23,100 +23,72 @@ function ScrollToTop() {
   return null
 }
 
-function GallerySkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading routes">
-      <div className="skeleton skeleton-hero" />
-      <div className="route-grid">
-        {Array.from({ length: 6 }, (_, index) => (
-          <div className="skeleton skeleton-card" key={index} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function App() {
   usePointerGlow()
-  const [routes, setRoutes] = useState([])
-  const [catalog, setCatalog] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  // Routes plus everything the backend allows (grades, roles, hold types/sizes, wall types)
-  const fetchAll = useCallback(() => {
-    Promise.all([api.getRoutes(), getOptions(), getWallTypes()])
-      .then(([routeList, options, wallTypes]) => {
-        setRoutes(routeList)
-        setCatalog({ ...options, wallTypes })
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => {
-    fetchAll()
-  }, [fetchAll])
-
-  function retry() {
-    setLoading(true)
-    setError('')
-    fetchAll()
-  }
-
-  // After any change, reload the list from the backend instead of patching a local copy
-  const refreshRoutes = async () => setRoutes(await api.getRoutes())
+  const routeList = useRouteList()
 
   // Returns the saved route so pages can navigate to it. Errors bubble up to RouteForm.
   async function saveRoute(route) {
     const saved = route.id ? await api.updateRoute(route) : await api.createRoute(route)
-    await refreshRoutes()
+    routeList.setRoutes((current) =>
+      route.id ? current.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...current],
+    )
     return saved
   }
 
   async function deleteRoute(id) {
     await api.deleteRoute(id)
-    await refreshRoutes()
+    routeList.setRoutes((current) => current.filter((item) => item.id !== id))
   }
 
+  // Reset replaces every route, so the list has to be reloaded. If that reload fails,
+  // the reset still succeeded: the gallery shows its own "Couldn't load routes" retry.
   async function resetRoutes() {
     await api.resetRoutes()
-    await refreshRoutes()
+    routeList.reload()
   }
 
   return (
     <BrowserRouter>
-      <CatalogContext.Provider value={catalog}>
       <ToastProvider>
         <ScrollToTop />
         <a className="skip-link" href="#main">Skip to content</a>
-        <Navbar routeCount={loading ? null : routes.length} />
+        <Navbar routeCount={routeList.status === 'ready' ? routeList.routes.length : null} />
         <main className="page-shell" id="main">
-          {loading ? (
-            <GallerySkeleton />
-          ) : error ? (
-            <section className="empty-state" role="alert">
-              <p className="eyebrow">ERROR</p>
-              <h1>Couldn't load routes.</h1>
-              <p className="lede">{error}</p>
-              <button className="button button-primary" type="button" onClick={retry}>Try again</button>
-            </section>
-          ) : (
+          <CatalogProvider>
             <Routes>
-              <Route path="/" element={<RouteGalleryPage routes={routes} onReset={resetRoutes} />} />
-              <Route path="/routes/new" element={<RouteBuilderPage routes={routes} onSave={saveRoute} />} />
+              <Route
+                path="/"
+                element={
+                  <RouteGalleryPage
+                    routes={routeList.routes}
+                    status={routeList.status}
+                    error={routeList.error}
+                    onRetry={routeList.reload}
+                    onReset={resetRoutes}
+                  />
+                }
+              />
+              <Route
+                path="/routes/new"
+                element={
+                  <RouteBuilderPage
+                    routes={routeList.status === 'ready' ? routeList.routes : []}
+                    onSave={saveRoute}
+                  />
+                }
+              />
               <Route path="/routes/:id" element={<RouteDetailsPage onDelete={deleteRoute} />} />
               <Route path="/routes/:id/edit" element={<EditRoutePage onSave={saveRoute} />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
-          )}
+          </CatalogProvider>
         </main>
         <footer className="site-footer">
-          <span><span className="brand-mark" aria-hidden="true">◈</span> Crux Maker</span>
-          <span>Build bouldering routes on a virtual wall.</span>
+          <span><span className="brand-mark" aria-hidden="true">◈</span> {APP_NAME}</span>
+          <span>{APP_TAGLINE}.</span>
         </footer>
       </ToastProvider>
-      </CatalogContext.Provider>
     </BrowserRouter>
   )
 }

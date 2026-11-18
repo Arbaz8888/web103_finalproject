@@ -1,0 +1,63 @@
+/* 3D wall frame and loading placeholder (shown before three.js downloads) */
+.wall-3d {
+  aspect-ratio: var(--grid-cols) / var(--grid-rows);
+  background: #14171a;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px var(--line);
+  color: #eef1ec;
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+.wall-3d-loading {
+  align-items: center;
+  color: #9aa39c;
+  display: flex;
+  flex-direction: column;
+  font-family: "DM Mono", monospace;
+  font-size: 0.8rem;
+  gap: 14px;
+  justify-content: center;
+}
+.wall-3d-loading::before {
+  animation: w3d-spin 0.9s linear infinite;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  border-top-color: var(--orange);
+  content: "";
+  height: 28px;
+  width: 28px;
+}
+@keyframes w3d-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Showcase variant: fills the hero stage with no border or background */
+.wall-3d.wall-3d-showcase {
+  aspect-ratio: auto;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  flex: 1;
+  -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 62%, transparent 100%);
+  min-height: 520px;
+}
+.wall-3d-showcase canvas {
+  cursor: default;
+  pointer-events: none;
+}
+@media (max-width: 960px) {
+  .wall-3d.wall-3d-showcase {
+    min-height: 440px;
+  }
+}
+@media (max-width: 640px) {
+  .wall-3d.wall-3d-showcase {
+    min-height: 380px;
+  }
+}

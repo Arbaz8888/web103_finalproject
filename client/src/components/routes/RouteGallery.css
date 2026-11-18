@@ -1,0 +1,12 @@
+/* Responsive card grid shared by RouteGallery and GallerySkeleton */
+.route-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+@media (max-width: 640px) {
+  .route-grid {
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

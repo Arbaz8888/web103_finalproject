@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import RouteForm from '../components/RouteForm'
+import RouteForm from '../components/builder/RouteForm'
 import { useToast } from '../hooks/useToast'
 import { usePageTitle } from '../hooks/usePageTitle'
 

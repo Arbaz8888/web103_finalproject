@@ -1,0 +1,263 @@
+/* Route builder: wall column, hold editor, details panel, checklist */
+.builder {
+  align-items: start;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+}
+.builder-wall {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 88px;
+}
+.builder-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  min-height: 40px;
+}
+.builder-toolbar .view-toggle {
+  flex-shrink: 0;
+  margin: 0;
+}
+.builder-toolbar .wall-instruction {
+  flex: 1;
+}
+.builder-toolbar-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+.wall-instruction {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+.wall-instruction strong {
+  color: var(--ink);
+  text-transform: capitalize;
+}
+.builder .wall-frame {
+  margin: 0 auto;
+}
+.builder-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.grade-picker {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(7, 1fr);
+}
+.grade-option {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: "DM Mono", monospace;
+  font-size: 0.82rem;
+  padding: 9px 0;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+}
+.grade-option:hover {
+  border-color: color-mix(in srgb, var(--tone, var(--muted)) 50%, transparent);
+  color: var(--ink);
+}
+.grade-option[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--tone, var(--muted)) 18%, transparent);
+  border-color: var(--tone, var(--muted));
+  color: var(--tone, var(--muted));
+}
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.checklist li {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.9rem;
+  gap: 10px;
+  transition: color 0.2s;
+}
+.checklist li.done {
+  color: var(--ink);
+}
+.checklist li.done .check {
+  background: var(--success);
+  border-color: var(--success);
+  color: #062016;
+  font-weight: 700;
+}
+.picked-chip {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.78rem;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 5px;
+}
+.picked-chip:hover {
+  background: var(--surface-2);
+}
+.picked-chip img {
+  background: var(--chalk);
+  border-radius: 50%;
+  height: 26px;
+  object-fit: contain;
+  padding: 2px;
+  width: 26px;
+}
+.builder-wall {
+  scroll-margin-top: 80px;
+}
+/* Hold editor: role and rotation for the selected hold, or instructions when nothing is selected */
+.hold-editor {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 14px;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.hold-editor.active {
+  border-color: rgba(255, 107, 44, 0.45);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.hold-editor-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+.hold-editor-head img {
+  background: var(--chalk);
+  border-radius: 10px;
+  height: 36px;
+  object-fit: contain;
+  padding: 3px;
+  width: 36px;
+}
+.hold-editor-title {
+  font-weight: 600;
+}
+.hold-editor-body {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+}
+.hold-editor-field {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+.hold-editor-label {
+  color: var(--faint);
+  font-family: "DM Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.role-segmented {
+  flex-wrap: wrap;
+}
+.shortcut-hint {
+  color: var(--faint);
+  display: block;
+  font-size: 0.74rem;
+  margin-top: 6px;
+}
+.checklist-count {
+  font-size: 0.85rem;
+  margin: -6px 0 0;
+}
+.wall-stage {
+  position: relative;
+}
+
+/* One angle slider for every wall type, with each type's share of it labelled underneath */
+.wall-type-readout {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+.wall-type-readout strong {
+  font-size: 0.92rem;
+}
+.wall-type-scale {
+  display: flex;
+  gap: 2px;
+  margin-top: -4px;
+}
+.wall-type-scale span {
+  border-top: 3px solid var(--surface-3);
+  color: var(--faint);
+  font-family: "DM Mono", monospace;
+  font-size: 0.64rem;
+  min-width: 0;
+  overflow: hidden;
+  padding-top: 5px;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: lowercase;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+  white-space: nowrap;
+}
+.wall-type-scale span.current {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+@media (max-width: 960px) {
+  .builder {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .builder-wall {
+    position: static;
+  }
+}
+@media (max-width: 640px) {
+  .builder-toolbar {
+    flex-wrap: wrap;
+  }
+  .hold-editor-head {
+    flex-wrap: wrap;
+  }
+  .hold-editor-field {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+  }
+  .role-segmented {
+    border-radius: 14px;
+    flex-shrink: 1;
+    max-width: 100%;
+  }
+}

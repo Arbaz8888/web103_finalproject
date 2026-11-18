@@ -1,0 +1,22 @@
+/* Color key for hold roles rendered below the wall */
+.hold-legend {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  gap: 18px;
+  justify-content: center;
+  margin-top: 18px;
+  text-transform: capitalize;
+}
+.hold-legend span {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+.legend-dot {
+  border-radius: 50%;
+  display: inline-block;
+  height: 9px;
+  width: 9px;
+}

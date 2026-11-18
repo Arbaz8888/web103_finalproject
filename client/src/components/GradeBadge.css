@@ -1,8 +1,0 @@
-/* Grade badge; its color comes from the .grade-<tone> classes in styles/base.css */
-.grade-badge { background: color-mix(in srgb, var(--tone, var(--muted)) 16%, transparent); border: 1px solid color-mix(in srgb, var(--tone, var(--muted)) 40%, transparent); border-radius: 8px; color: var(--tone, var(--muted)); display: inline-block; font-family: 'DM Mono', monospace; font-weight: 500; line-height: 1; white-space: nowrap; }
-.grade-badge-md { font-size: .8rem; padding: 6px 8px; }
-.grade-badge-lg { font-size: 1rem; padding: 8px 11px; }
-.grade-badge-xl { border-radius: 16px; font-size: 1.9rem; letter-spacing: -.04em; padding: 18px 16px; }
-@media (max-width: 640px) {
-  .grade-badge-xl { font-size: 1.4rem; padding: 12px; }
-}

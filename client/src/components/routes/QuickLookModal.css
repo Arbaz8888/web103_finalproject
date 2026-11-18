@@ -1,0 +1,63 @@
+/* Quick look dialog: wall preview beside the route info */
+.dialog-quicklook {
+  max-width: min(760px, calc(100vw - 32px));
+  padding: 0;
+  width: 100%;
+}
+.dialog-quicklook[open] {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+}
+.quicklook-wall {
+  background: radial-gradient(120% 80% at 50% 0%, #2a3036, #121518);
+  display: flex;
+  align-items: center;
+  padding: 28px;
+}
+.quicklook-info {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 32px 28px 28px;
+}
+.quicklook-info .eyebrow {
+  margin: 0;
+}
+.quicklook-title {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-right: 40px;
+}
+.quicklook-title h2 {
+  font-size: 2rem;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  margin: 0;
+}
+.quicklook-info p {
+  margin: 0;
+}
+.quicklook-info .button {
+  margin-top: auto;
+}
+.quicklook-info .hold-legend {
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+@media (max-width: 960px) {
+  .dialog-quicklook[open] {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .quicklook-wall {
+    justify-content: center;
+    padding: 24px 64px;
+  }
+}
+@media (max-width: 640px) {
+  .quicklook-wall {
+    padding: 20px 40px;
+  }
+}

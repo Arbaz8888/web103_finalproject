@@ -1,5 +1,0 @@
-/* 3D wall frame and loading placeholder (shown before three.js downloads) */
-.wall-3d { aspect-ratio: 3 / 4; background: #14171a; border-radius: var(--radius-lg); box-shadow: var(--shadow), 0 0 0 1px var(--line); color: #eef1ec; isolation: isolate; overflow: hidden; position: relative; width: 100%; }
-.wall-3d-loading { align-items: center; color: #9aa39c; display: flex; flex-direction: column; font-family: 'DM Mono', monospace; font-size: .8rem; gap: 14px; justify-content: center; }
-.wall-3d-loading::before { animation: w3d-spin .9s linear infinite; border: 2px solid rgba(255,255,255,.12); border-radius: 50%; border-top-color: var(--orange); content: ''; height: 28px; width: 28px; }
-@keyframes w3d-spin { to { transform: rotate(360deg); } }

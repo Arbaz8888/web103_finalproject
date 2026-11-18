@@ -1,0 +1,20 @@
+import { useCatalog } from '../../hooks/useCatalog'
+import './HoldLegend.css'
+import { roleColor } from '../../utils/display'
+
+// Color key for hold roles; the roles themselves come from the backend
+function HoldLegend() {
+  const { holdRoles } = useCatalog()
+  return (
+    <div className="hold-legend" aria-label="Hold colors">
+      {holdRoles.map((role) => (
+        <span key={role}>
+          <i className="legend-dot" style={{ background: roleColor(role) }} />
+          {role}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+export default HoldLegend

@@ -1,6 +1,0 @@
-/* Tiny side-on wall angle sketch */
-.angle-glyph { flex-shrink: 0; height: 16px; overflow: visible; width: 19px; }
-.angle-glyph-lg { height: 24px; width: 28px; }
-.angle-glyph-floor { stroke: var(--faint); stroke-width: 2.4; }
-.angle-glyph-ref { stroke: var(--faint); stroke-dasharray: 2 2.5; stroke-width: 1.6; }
-.angle-glyph-wall { stroke: var(--accent); stroke-linecap: round; stroke-width: 3.6; }
