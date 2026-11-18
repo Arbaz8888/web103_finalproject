@@ -44,10 +44,10 @@ const SELECT_ROUTES = `
 `;
 
 
-// Save Check: a route needs a name, grade, wall type, angle, valid holds, 1-2 start holds and exactly one finish hold
-const validateRoute = ({ name, grade, wallTypeId, angleDegrees, holds } = {}) => {
-	if (!name?.trim() || !grade || !wallTypeId) {
-		return 'A route needs a name, grade, and wall type.';
+// Save Check: a route needs a name, grade, angle, valid holds, 1-2 start holds and exactly one finish hold
+const validateRoute = ({ name, grade, angleDegrees, holds } = {}) => {
+	if (!name?.trim() || !grade) {
+		return 'A route needs a name and grade.';
 	}
 	if (name.trim().length > MAX_ROUTE_NAME_LENGTH) {
 		return `Route names can be at most ${MAX_ROUTE_NAME_LENGTH} characters.`;
@@ -89,13 +89,13 @@ const validateRoute = ({ name, grade, wallTypeId, angleDegrees, holds } = {}) =>
 	return null;
 };
 
-// The wall type must be the one whose angle range contains the route's angle
-const wallTypeMatchesAngle = async (db, wallTypeId, angle) => {
-	const results = await db.query(
-		'SELECT 1 FROM wall_types WHERE id = $1 AND $2 BETWEEN min_angle AND max_angle',
-		[wallTypeId, angle]
+// Each wall type covers an angle range; the route's angle picks its type
+const findWallTypeId = async (angle) => {
+	const results = await pool.query(
+		'SELECT id FROM wall_types WHERE $1 BETWEEN min_angle AND max_angle',
+		[angle]
 	);
-	return results.rowCount > 0;
+	return results.rows[0]?.id ?? null;
 };
 
 const insertRouteHolds = (client, routeId, holds) => {
@@ -140,9 +140,10 @@ const createRoute = async (req, res) => {
 		return res.status(400).json({ error: message });
 	}
 
-	const { name, grade, angleDegrees, wallTypeId, holds } = req.body;
-	if (!(await wallTypeMatchesAngle(pool, wallTypeId, angleDegrees))) {
-		return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
+	const { name, grade, angleDegrees, holds } = req.body;
+	const wallTypeId = await findWallTypeId(angleDegrees);
+	if (wallTypeId === null) {
+		return res.status(400).json({ error: "The wall angle doesn't match any wall type." });
 	}
 
 	const route = await withTransaction(async (client) => {
@@ -164,9 +165,10 @@ const updateRoute = async (req, res) => {
 	}
 
 	const { id } = req.params;
-	const { name, grade, angleDegrees, wallTypeId, holds } = req.body;
-	if (!(await wallTypeMatchesAngle(pool, wallTypeId, angleDegrees))) {
-		return res.status(400).json({ error: "The wall type doesn't match the wall angle." });
+	const { name, grade, angleDegrees, holds } = req.body;
+	const wallTypeId = await findWallTypeId(angleDegrees);
+	if (wallTypeId === null) {
+		return res.status(400).json({ error: "The wall angle doesn't match any wall type." });
 	}
 
 	// Returns null when no route has this id (nothing was written, so COMMIT is harmless)

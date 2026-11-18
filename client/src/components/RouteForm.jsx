@@ -147,7 +147,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     setError('')
     setSaving(true)
     try {
-      await onSave({ id: existing?.id, name: name.trim(), grade, wallTypeId: wallType.id, angle, holds })
+      await onSave({ id: existing?.id, name: name.trim(), grade, angle, holds })
     } catch (err) {
       setError(err.message)
       setSaving(false)
