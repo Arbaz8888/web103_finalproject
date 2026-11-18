@@ -90,6 +90,7 @@ input::placeholder { color: var(--faint); }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
 .check { align-items: center; border: 1.5px solid var(--line-strong); border-radius: 50%; display: flex; flex-shrink: 0; font-size: .7rem; height: 20px; justify-content: center; transition: background .2s, border-color .2s; width: 20px; }
 .skeleton-details { height: 640px; }
+.skeleton-page { min-height: 60vh; }
 .field-hint { color: var(--muted); font-size: .82rem; line-height: 1.45; margin: 0; }
 @media (max-width: 640px) {
   .page-shell { padding: 32px 16px 72px; }

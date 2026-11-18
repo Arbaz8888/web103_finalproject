@@ -3,10 +3,10 @@ import { roleColor } from '../utils/display'
 
 // Color key for hold roles; the roles themselves come from the backend
 function HoldLegend() {
-  const catalog = useCatalog()
+  const { holdRoles } = useCatalog()
   return (
     <div className="hold-legend" aria-label="Hold colors">
-      {(catalog?.holdRoles ?? []).map((role) => (
+      {holdRoles.map((role) => (
         <span key={role}>
           <i className={`legend-dot ${role}`} style={{ background: roleColor(role) }} />
           {role}

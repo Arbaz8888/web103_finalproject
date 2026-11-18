@@ -19,12 +19,19 @@ function RouteDetailsPage({ onDelete }) {
   const toast = useToast()
   const [view, setView] = useState('2D')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const { status, route, error } = useRoute(id)
+  const { status, route, error, retry } = useRoute(id)
   usePageTitle(route?.name ?? (status === 'loading' ? 'Loading route' : 'Route not found'))
 
   if (status === 'loading') return <div className="skeleton skeleton-details" aria-busy="true" aria-label="Loading route" />
   if (status === 'missing') return <NotFoundPage message="That route doesn't exist, or it was deleted." />
-  if (status === 'error') return <p className="form-error" role="alert">Could not load this route: {error}</p>
+  if (status === 'error') return (
+    <section className="empty-state" role="alert">
+      <p className="eyebrow">ERROR</p>
+      <h1>Couldn't load this route.</h1>
+      <p className="lede">{error}</p>
+      <button className="button button-primary" type="button" onClick={retry}>Try again</button>
+    </section>
+  )
 
   async function handleDelete() {
     try {

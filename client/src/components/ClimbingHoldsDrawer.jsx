@@ -1,57 +1,30 @@
-import { useEffect, useMemo, useState } from 'react'
-import { fetchHolds } from '../api/holds'
+import { useMemo, useState } from 'react'
 import { useCatalog } from '../hooks/useCatalog'
 import './ClimbingHoldsDrawer.css'
 
 // Pick a hold from the catalog, then tap bolts on the wall to place it.
 // Role and rotation are set on each placed hold afterwards, not here.
 function ClimbingHoldsDrawer({ selectedHold, onSelectHold }) {
-  const { holdTypes, holdSizes } = useCatalog()
-  const [holds, setHolds] = useState([])
-  const [status, setStatus] = useState('loading')
+  const { holds, holdTypes } = useCatalog()
   const [activeType, setActiveType] = useState(null)
-  const [attempt, setAttempt] = useState(0)
 
-  useEffect(() => {
-    let cancelled = false
-    fetchHolds()
-      .then((data) => {
-        if (cancelled) return
-        setHolds(data)
-        setStatus('ready')
-      })
-      .catch(() => !cancelled && setStatus('error'))
-    return () => {
-      cancelled = true
-    }
-  }, [attempt])
-
-  // One tab per hold type in the backend's order, each ordered small -> large
+  // One tab per hold type in the backend's order; server returns holds ordered by type then size
   const sections = useMemo(
     () =>
       holdTypes
         .map((type) => ({
           type,
-          holds: holds
-            .filter((hold) => hold.holdType === type)
-            .sort((a, b) => holdSizes.indexOf(a.size) - holdSizes.indexOf(b.size)),
+          holds: holds.filter((hold) => hold.holdType === type),
         }))
         .filter((section) => section.holds.length > 0),
-    [holds, holdTypes, holdSizes],
+    [holds, holdTypes],
   )
 
   const current = sections.find((section) => section.type === activeType) ?? sections[0]
 
   return (
     <div className="holds-drawer">
-      {status === 'loading' && <p className="holds-drawer-note">Loading holds…</p>}
-      {status === 'error' && (
-        <div className="holds-drawer-note" role="alert">
-          Couldn't load the hold catalog.{' '}
-          <button className="holds-drawer-retry" onClick={() => { setStatus('loading'); setAttempt((count) => count + 1) }} type="button">Retry</button>
-        </div>
-      )}
-      {status === 'ready' && sections.length === 0 && <p className="holds-drawer-note">No holds available yet.</p>}
+      {sections.length === 0 && <p className="holds-drawer-note">No holds available yet.</p>}
 
       {current && (
         <>

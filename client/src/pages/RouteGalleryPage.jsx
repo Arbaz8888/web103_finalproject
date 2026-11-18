@@ -5,6 +5,7 @@ import QuickLookModal from '../components/QuickLookModal'
 import RouteGallery from '../components/RouteGallery'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import GradeBadge from '../components/GradeBadge'
+import GallerySkeleton from '../components/GallerySkeleton'
 import Wall3DLazy from '../components/Wall3DLazy'
 import { useCatalog } from '../hooks/useCatalog'
 import { useToast } from '../hooks/useToast'
@@ -13,7 +14,7 @@ import './RouteGalleryPage.css'
 
 const EMPTY_FILTERS = { query: '', grade: '', wallType: '', sort: 'newest' }
 
-function RouteGalleryPage({ routes, onReset }) {
+function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
   usePageTitle('Route gallery')
   const toast = useToast()
   const { grades } = useCatalog()
@@ -51,7 +52,7 @@ function RouteGalleryPage({ routes, onReset }) {
   async function handleReset() {
     try {
       await onReset()
-      setFilters(EMPTY_FILTERS)
+      setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))
       toast('Wall reset to the starter routes')
     } catch (err) {
       toast(err.message, 'error')
@@ -107,7 +108,15 @@ function RouteGalleryPage({ routes, onReset }) {
 
       <GradeFilter routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))} />
 
-      {routes.length === 0 ? (
+      {status === 'loading' ? (
+        <GallerySkeleton />
+      ) : status === 'error' ? (
+        <section className="empty-panel" role="alert">
+          <h3>Couldn't load routes.</h3>
+          <p className="muted">{error}</p>
+          <button className="button button-primary" type="button" onClick={onRetry}>Try again</button>
+        </section>
+      ) : routes.length === 0 ? (
         <section className="empty-panel">
           <h3>No routes yet.</h3>
           <p className="muted">Build the first route, or reset the wall to bring back the starter routes.</p>
@@ -117,7 +126,7 @@ function RouteGalleryPage({ routes, onReset }) {
         <section className="empty-panel">
           <h3>No routes match.</h3>
           <p className="muted">Try a different grade or wall type, or clear your filters.</p>
-          <button className="button button-ghost" type="button" onClick={() => setFilters(EMPTY_FILTERS)}>Clear filters</button>
+          <button className="button button-ghost" type="button" onClick={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))}>Clear filters</button>
         </section>
       ) : (
         <RouteGallery routes={visibleRoutes} onQuickLook={setPreviewRoute} />

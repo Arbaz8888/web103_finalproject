@@ -446,7 +446,7 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
   const container = useRef()
   const [visible, setVisible] = useState(true)
   const [recenter, setRecenter] = useState(0)
-  const catalog = useCatalog()
+  const { holdRoles } = useCatalog()
   const [focusRole, setFocusRole] = useState(null)
   const [autoRotate, setAutoRotate] = useState(() => showcase && !prefersReducedMotion())
   const [interacted, setInteracted] = useState(false)
@@ -459,7 +459,7 @@ function Wall3DComponent({ holds = [], angle = 0, wallType, showcase = false }) 
   const view = useMemo(() => ({ ...views.home, recenter }), [views, recenter])
   const name = wallType ? wallType.charAt(0).toUpperCase() + wallType.slice(1).toLowerCase() : 'Wall'
   // Roles used on this wall, in the backend's order, for the highlight buttons
-  const usedRoles = (catalog?.holdRoles ?? []).filter((role) => holds.some((hold) => roleOf(hold).id === role)).map((role) => roleOf({ role }))
+  const usedRoles = holdRoles.filter((role) => holds.some((hold) => roleOf(hold).id === role)).map((role) => roleOf({ role }))
   const handleInteract = useCallback(() => setInteracted(true), [])
 
   useEffect(() => {
