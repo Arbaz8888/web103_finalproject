@@ -63,21 +63,21 @@
   font-family: "DM Mono", monospace;
   font-size: 0.75rem;
 }
-.w3d-glyph {
+.angle-glyph.w3d-glyph {
   height: 26px;
   overflow: visible;
   width: 30px;
 }
-.w3d-glyph-floor {
+.w3d-glyph .angle-glyph-floor {
   stroke: rgba(255, 255, 255, 0.35);
   stroke-width: 2;
 }
-.w3d-glyph-ref {
+.w3d-glyph .angle-glyph-ref {
   stroke: rgba(255, 255, 255, 0.25);
   stroke-dasharray: 2 2;
   stroke-width: 1.4;
 }
-.w3d-glyph-wall {
+.w3d-glyph .angle-glyph-wall {
   stroke: var(--orange);
   stroke-linecap: round;
   stroke-width: 3.5;

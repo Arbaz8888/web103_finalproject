@@ -4,26 +4,17 @@ import { findOverlappingHold, getCoveredBolts, getHoldSize, HOLD_SCALE } from '.
 import { roleColor } from '../../utils/display'
 import { formatLabel } from '../../utils/format'
 import { useCatalog } from '../../hooks/useCatalog'
+import AngleGlyph from './AngleGlyph'
 import './WallComponent.css'
 
 // Side view of the wall: floor line, dashed vertical reference, and the wall tilted to `angle`.
 // The climber stands on the right, so overhangs lean right.
 function WallProfile({ wallType, angle }) {
-  const radians = (Math.max(-90, Math.min(90, angle)) * Math.PI) / 180
-  const baseX = 14
-  const baseY = 32
-  const length = 26
-  const topX = baseX + length * Math.sin(radians)
-  const topY = baseY - length * Math.cos(radians)
   const name = formatLabel(wallType)
 
   return (
     <div className="wall-profile" aria-label={`${name} wall, ${angle} degrees`} role="img">
-      <svg viewBox="0 0 44 36" aria-hidden="true">
-        <line className="wall-profile-floor" x1="4" y1={baseY} x2="40" y2={baseY} />
-        <line className="wall-profile-ref" x1={baseX} y1={baseY} x2={baseX} y2={baseY - length} />
-        <line className="wall-profile-wall" x1={baseX} y1={baseY} x2={topX} y2={topY} />
-      </svg>
+      <AngleGlyph angle={angle} className="wall-profile-glyph" />
       <span>{name} · {angle}°</span>
     </div>
   )
