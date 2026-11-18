@@ -49,10 +49,13 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
   // The busiest route makes the best-looking homepage wall
   const featured = useMemo(() => routes.reduce((best, route) => (!best || route.holds.length > best.holds.length ? route : best), null), [routes])
 
+  // Clears search, grade and wall type; the sort is a view preference and stays
+  const clearFilters = () => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))
+
   async function handleReset() {
     try {
       await onReset()
-      setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))
+      clearFilters()
       toast('Wall reset to the starter routes')
     } catch (err) {
       toast(err.message, 'error')
@@ -106,7 +109,7 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
         </button>
       </div>
 
-      <RouteFilters routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))} />
+      <RouteFilters routes={routes} filters={filters} onChange={(changes) => setFilters((current) => ({ ...current, ...changes }))} onClear={clearFilters} />
 
       {status === 'loading' ? (
         <GallerySkeleton />
@@ -126,7 +129,7 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
         <section className="empty-panel">
           <h3>No routes match.</h3>
           <p className="muted">Try a different grade or wall type, or clear your filters.</p>
-          <button className="button button-ghost" type="button" onClick={() => setFilters((current) => ({ ...EMPTY_FILTERS, sort: current.sort }))}>Clear filters</button>
+          <button className="button button-ghost" type="button" onClick={clearFilters}>Clear filters</button>
         </section>
       ) : (
         <RouteGallery routes={visibleRoutes} onQuickLook={setPreviewRoute} />
