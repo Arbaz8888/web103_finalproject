@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import WallComponent from '../wall/WallComponent'
 import HoldLegend from '../wall/HoldLegend'
 import AngleGlyph from '../wall/AngleGlyph'
@@ -7,13 +7,13 @@ import RotationDial from './RotationDial'
 import ViewToggle from '../wall/ViewToggle'
 import Wall3DLazy from '../wall/Wall3DLazy'
 import { useCatalog } from '../../hooks/useCatalog'
+import { useHoldHistory } from './useHoldHistory'
+import { useBuilderShortcuts } from './useBuilderShortcuts'
 import { normalizeRotation } from '../../utils/rotation'
 import { formatLabel } from '../../utils/format'
 import { gradeTone, roleColor } from '../../utils/display'
 import './RouteForm.css'
 
-const HISTORY_LIMIT = 50
-const isTyping = (target) => ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable
 const sameSpot = (a, b) => a && b && a.gridRow === b.gridRow && a.gridCol === b.gridCol
 
 function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
@@ -22,8 +22,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
   const [grade, setGrade] = useState(existing?.grade ?? grades[0])
   const [angleDegrees, setAngleDegrees] = useState(existing?.angleDegrees ?? 0)
   const [catalogHold, setCatalogHold] = useState(null)
-  const [holds, setHolds] = useState(existing?.holds ?? [])
-  const [history, setHistory] = useState([])
+  const { holds, canUndo, commit, checkpoint, undo, clear } = useHoldHistory(existing?.holds ?? [])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [selectedCell, setSelectedCell] = useState(null)
@@ -55,16 +54,30 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     return false
   }
 
-  // Every change to the holds goes through here so it can be undone
-  function commitHolds(next, { record = true } = {}) {
-    if (record) setHistory((past) => [...past.slice(-(HISTORY_LIMIT - 1)), holds])
-    setHolds(next)
+  function updateSelectedHold(changes, options) {
+    commit(holds.map((hold) => (hold === selectedHold ? { ...hold, ...changes } : hold)), options)
   }
 
-  function undo() {
-    if (history.length === 0) return
-    setHolds(history[history.length - 1])
-    setHistory((past) => past.slice(0, -1))
+  function handleRotationStart() {
+    draggingRotation.current = true
+    checkpoint()
+  }
+
+  function setRotation(degrees) {
+    updateSelectedHold({ rotation: normalizeRotation(degrees, maxRotation) }, { record: !draggingRotation.current })
+  }
+
+  function handleRotationEnd() {
+    draggingRotation.current = false
+  }
+
+  function removeHold() {
+    commit(holds.filter((hold) => hold !== selectedHold))
+    setSelectedCell(null)
+  }
+
+  function clearWall() {
+    clear()
     setSelectedCell(null)
   }
 
@@ -84,7 +97,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
       return
     }
     setError('')
-    commitHolds([
+    commit([
       ...holds,
       {
         gridRow: row,
@@ -101,52 +114,12 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     setSelectedCell({ gridRow: row, gridCol: col })
   }
 
-  function updateSelectedHold(changes, options) {
-    commitHolds(holds.map((hold) => (hold === selectedHold ? { ...hold, ...changes } : hold)), options)
-  }
-
-  function handleRotationStart() {
-    draggingRotation.current = true
-    setHistory((past) => [...past.slice(-(HISTORY_LIMIT - 1)), holds])
-  }
-
-  function setRotation(degrees) {
-    updateSelectedHold({ rotation: normalizeRotation(degrees, maxRotation) }, { record: !draggingRotation.current })
-  }
-
-  function handleRotationEnd() {
-    draggingRotation.current = false
-  }
-
-  function removeHold() {
-    commitHolds(holds.filter((hold) => hold !== selectedHold))
-    setSelectedCell(null)
-  }
-
-  function clearWall() {
-    if (holds.length === 0) return
-    commitHolds([])
-    setSelectedCell(null)
-  }
-
-  // Keyboard shortcuts: Ctrl/Cmd+Z undo, Delete remove, R rotate 15°, Escape deselect
-  useEffect(() => {
-    function onKeyDown(event) {
-      if (isTyping(event.target) || event.target.getAttribute('role') === 'slider') return
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-        event.preventDefault()
-        undo()
-      } else if (selectedHold && (event.key === 'Delete' || event.key === 'Backspace')) {
-        event.preventDefault()
-        removeHold()
-      } else if (selectedHold && event.key.toLowerCase() === 'r') {
-        updateSelectedHold({ rotation: normalizeRotation(selectedHold.rotation + 15, maxRotation) })
-      } else if (event.key === 'Escape') {
-        setSelectedCell(null)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+  useBuilderShortcuts({
+    onUndo: undo,
+    onRemove: removeHold,
+    onRotate: (step) => updateSelectedHold({ rotation: normalizeRotation((selectedHold?.rotation ?? 0) + step, maxRotation) }),
+    onDeselect: () => setSelectedCell(null),
+    hasSelection: Boolean(selectedHold),
   })
 
   // The Save button stays disabled until the checklist is complete
@@ -174,7 +147,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
                 <span>Change hold</span>
               </button>
             )}
-            <button className="icon-button" type="button" onClick={undo} disabled={history.length === 0} title="Undo (Ctrl+Z)" aria-label="Undo">
+            <button className="icon-button" type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" aria-label="Undo">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
             </button>
             <button className="icon-button" type="button" onClick={clearWall} disabled={holds.length === 0} title="Clear all holds" aria-label="Clear all holds">
