@@ -1,0 +1,374 @@
+# Architecture
+
+This document explains how Custom Climbing Route Maker is put together. It's for teammates (and future us) who need to find their way around the code.
+
+> **Scope:** Sections 1–7 cover the **backend** (`/server`) and the API contract. Sections 8–13 cover the **frontend** (`/client`). Both describe the code as it is today, before the planned refactors in `backend-refactor-plan.md`.
+
+---
+
+## 1. The big picture
+
+```
+┌──────────────────────────┐   fetch /api/*    ┌──────────────────────────┐   pg Pool   ┌──────────────┐
+│  React app  (/client)    │ ───────────────►  │  Express API  (/server)  │ ──────────► │  PostgreSQL  │
+│  Vite dev server :5173   │ ◄───────────────  │  :3000                   │ ◄────────── │  (Render)    │
+└──────────────────────────┘   JSON            └──────────────────────────┘             └──────────────┘
+```
+
+- In development, `npm run dev` (repo root) starts both apps with `concurrently`. Vite proxies every `/api/*` request to `http://localhost:3000` (see `client/vite.config.js`), so the client never needs to know the server's URL.
+- In production, the client reads the server's address from `VITE_API_URL`.
+- The server is a plain Express app with no ORM: every query is hand-written SQL run through a shared `pg.Pool`.
+
+## 2. Folder layout
+
+```
+server/
+├── server.js                 Entry point: loads env, mounts the four routers, starts listening
+├── config/
+│   ├── dotenv.js             Loads the repo-root .env (imported for its side effect)
+│   ├── database.js           Exports the shared pg Pool
+│   └── reset.js              Creates every table/enum and seeds starter data
+│                             (runs as a script AND is imported by the reset endpoint)
+├── routes/                   One Express Router per resource. Maps URL + verb → controller function
+│   ├── climbingRoutes.js
+│   ├── holds.js
+│   ├── options.js
+│   └── wallTypes.js
+├── controllers/              Request handlers. Validation, SQL and the HTTP response all live here
+│   ├── climbingRoutes.js
+│   ├── holds.js
+│   ├── options.js
+│   └── wallTypes.js
+└── data/                     Starter rows used by reset.js
+    ├── WallTypes.js
+    ├── StartingHolds.js
+    ├── StartingRoutes.js
+    └── StartingRouteHolds.js
+```
+
+The pattern is **router → controller → SQL**. There's no separate model or service layer; each controller talks to the database directly.
+
+> **Naming gotcha:** "route" means two things here. A **climbing route** is a boulder problem (the `climbing_routes` table). An **Express route** is a URL handler (the `routes/` folder). The code uses `ClimbingRoutes…` for the first meaning to keep them apart.
+
+## 3. Database
+
+### Tables
+
+```
+wall_types 1 ──── * climbing_routes 1 ──── * route_holds * ──── 1 climbing_holds
+```
+
+| Table | What it holds | Notes |
+|---|---|---|
+| `wall_types` | The 4 wall styles (slab, vertical, overhang, roof) and the angle range each one covers | Reference data, seeded only |
+| `climbing_holds` | The catalog of hold shapes you can place (type, size, color, image) | Reference data, seeded only. `image_url` points to files in `client/public/holds/` |
+| `climbing_routes` | A saved boulder problem: name, grade, wall angle, wall type | `wall_type_id` → `wall_types.id` |
+| `route_holds` | One placed hold on one route: which hold, where on the grid, its role and rotation | Join table. Deleting a route deletes its holds (`ON DELETE CASCADE`) |
+
+### Enums
+
+All of these are Postgres enums created in `config/reset.js`. **They are the single source of truth.** The frontend reads them at runtime via `GET /api/options` instead of keeping its own copy.
+
+| Enum | Values |
+|---|---|
+| `wall_angles` | slab, vertical, overhang, roof |
+| `grades` | V0 … V12 (the enum order is used as the difficulty order for sorting) |
+| `hold_types` | crimp, jug, sloper, pocket, pinch |
+| `hold_sizes` | small, medium, large |
+| `hold_roles` | start, hand, foot, any, finish |
+
+### Constraints that act as business rules
+
+- `route_holds.grid_row` is 0–15 and `grid_col` is 0–11. That's the 12 × 16 bolt grid. Row 0 is the top of the wall.
+- `UNIQUE (route_id, grid_row, grid_col)`: a route can't have two holds on the same bolt.
+- Wall type ranges (from `data/WallTypes.js`): slab −20…−1°, vertical 0…5°, overhang 6…50°, roof 51…90°.
+
+### Resetting and seeding
+
+`npm run reset` (from the repo root or `/server`) runs `config/reset.js`, which for each table:
+
+1. `DROP TABLE … CASCADE` and `DROP TYPE` (the enum),
+2. recreates the enum and table,
+3. inserts the starter rows with **explicit ids**,
+4. moves the table's id sequence past the highest id, so new rows don't collide.
+
+Order matters because of foreign keys: `wall_types` → `climbing_holds` → `climbing_routes` → `route_holds`.
+
+The same `seedAllTables()` function is exported and called by `POST /api/routes/reset`, so the "Reset the wall" button in the app does exactly what `npm run reset` does.
+
+## 4. API reference
+
+All responses are JSON. Errors are always `{ "error": "message" }`.
+
+| Method & path | Controller | What it does | Used by (client) |
+|---|---|---|---|
+| `GET /api/options` | `options.getOptions` | Enum values + hold-count limits | `api/options.js` → `App.jsx` → catalog context |
+| `GET /api/wall-types` | `wallTypes.getWallTypes` | All wall types, ordered by `min_angle` | `api/wallTypes.js` → `App.jsx` → catalog context |
+| `GET /api/holds` | `holds.getHolds` | The hold catalog | `api/holds.js` → `ClimbingHoldsDrawer` |
+| `GET /api/routes` | `climbingRoutes.getRoutes` | Every route with its holds, newest first | `api/routes.js` → `App.jsx` (gallery list) |
+| `GET /api/routes/:id` | `climbingRoutes.getRouteById` | One route with its holds | `hooks/useRoute.js` → details & edit pages |
+| `POST /api/routes` | `climbingRoutes.createRoute` | Create a route (validated) | `RouteForm` → `RouteBuilderPage` → `App.saveRoute` |
+| `PATCH /api/routes/:id` | `climbingRoutes.updateRoute` | Replace a route and **all** of its holds | `RouteForm` → `EditRoutePage` → `App.saveRoute` |
+| `PUT /api/routes/:id` | `climbingRoutes.updateRoute` | Same handler as PATCH (not used by the client) | — |
+| `DELETE /api/routes/:id` | `climbingRoutes.deleteRoute` | Delete a route (its holds cascade) | `RouteDetailsPage` → `App.deleteRoute` |
+| `POST /api/routes/reset` | `climbingRoutes.resetRoutes` | Drop and reseed the **whole database** | `RouteGalleryPage` → `App.resetRoutes` |
+
+### Route object (response)
+
+```jsonc
+{
+  "id": 1,
+  "name": "Easy Test",
+  "grade": "V1",
+  "angle_degrees": 0,
+  "wall_type_id": 2,
+  "wall_type": "vertical",
+  "created_at": "2025-09-01T10:00:00.000Z",
+  "holds": [
+    {
+      "routeHoldId": 1, "holdId": 6,
+      "imageUrl": "/holds/jug-green-large.png", "size": "large", "holdType": "jug", "color": "green",
+      "gridRow": 14, "gridCol": 4, "role": "start", "rotation": 0
+    }
+  ]
+}
+```
+
+Note that the route's own fields are `snake_case` but the nested hold fields are `camelCase`. That's because the holds are built inside SQL with `json_build_object(...)` in `SELECT_ROUTES`.
+
+### Route body (create / update request)
+
+```jsonc
+{
+  "name": "My Route",
+  "grade": "V3",
+  "angle_degrees": 20,
+  "wall_type_id": 3,
+  "holds": [
+    { "holdId": 6, "gridRow": 14, "gridCol": 4, "role": "start", "rotation": 0 }
+  ]
+}
+```
+
+### The "Save Check" (user story 6)
+
+A save goes through three layers of checking, in this order:
+
+1. **`validateRoute()`** in `controllers/climbingRoutes.js` (plain JS, before touching the DB):
+   - `name` (non-blank), `grade` and `wall_type_id` are present
+   - `angle_degrees` is an integer
+   - `holds` is an array with **1 – `MAX_START_HOLDS` (2)** start holds and **exactly `FINISH_HOLDS` (1)** finish hold
+   - every `rotation` is an integer from 0 to 359
+2. **`wallTypeMatchesAngle()`**: the chosen wall type's angle range must contain `angle_degrees`.
+3. **Postgres constraints**: unknown grade/role (bad enum), unknown `holdId` (foreign key), off-grid position (CHECK), two holds on one bolt (UNIQUE). `sendError()` turns these specific error codes into a `400`, and everything else into a `500`.
+
+The frontend `RouteForm` mirrors rule 1 using the limits from `/api/options`, so the Save button is disabled until the route would pass.
+
+### Create and update are transactions
+
+`createRoute` and `updateRoute` take a dedicated client from the pool and wrap their writes in `BEGIN … COMMIT`:
+
+- **Create:** insert the `climbing_routes` row → insert all `route_holds` rows in one multi-row `INSERT` (`insertRouteHolds`) → commit → re-read the full route with `findRoute()` and return it.
+- **Update:** update the `climbing_routes` row (404 if it doesn't exist) → delete **all** that route's `route_holds` → reinsert the new set → commit → return the fresh route.
+
+So an update is always a **full replacement** of the route and its holds, even though the client sends it as `PATCH`.
+
+## 5. Tracing a request end to end
+
+### Loading the app
+
+```
+App.jsx  fetchAll()
+  ├─ api/routes.js     getRoutes()     → GET /api/routes      → SELECT_ROUTES … ORDER BY created_at DESC
+  ├─ api/options.js    getOptions()    → GET /api/options     → enum_range(...) for each enum + JS constants
+  └─ api/wallTypes.js  getWallTypes()  → GET /api/wall-types  → SELECT … FROM wall_types
+       │
+       ├─ routes  → state, passed as props to RouteGalleryPage / RouteBuilderPage
+       └─ options + wallTypes → CatalogContext (read with useCatalog() by RouteForm, GradeFilter,
+                                 GradeBadge, Hold legend, ClimbingHoldsDrawer, Wall3DComponent)
+```
+
+### Saving a new route
+
+```
+RouteForm  (user clicks Save)
+  → RouteBuilderPage.handleSave
+  → App.saveRoute(route)                     (no id → create)
+  → api/routes.js createRoute → toApiRoute()  (camelCase client shape → API body)
+  → POST /api/routes
+  → validateRoute → wallTypeMatchesAngle → BEGIN / INSERT route / INSERT holds / COMMIT → findRoute
+  ← 201 + route JSON → toClientRoute()
+  → App.refreshRoutes() (refetches the full list)
+  → navigate to /routes/:id
+```
+
+Editing follows the same path through `EditRoutePage`, with an `id` present, so `App.saveRoute` calls `updateRoute` (`PATCH`).
+
+### Shape translation (client side)
+
+The client never uses the raw API shape. `client/src/api/routes.js` converts in both directions:
+
+| API | Client |
+|---|---|
+| `angle_degrees` | `angle` |
+| `wall_type_id` | `wallTypeId` |
+| `wall_type` (`"overhang"`) | `wallType` (`"Overhang"`, capitalized) |
+| `gridRow` / `gridCol` | `row` / `col` |
+| `rotation` (any int) | `rotation` normalized to 0–359 |
+| `created_at`, `routeHoldId` | dropped |
+
+`api/holds.js` and `api/options.js` do the same snake_case → camelCase mapping for their endpoints.
+
+## 6. How the MVP user stories map to the backend
+
+| # | Story | Backend support |
+|---|---|---|
+| 1 | Click holds to build a route | `GET /api/holds` (catalog) + `POST /api/routes` |
+| 2 | Mark start and finish holds | `hold_roles` enum, `route_holds.role` |
+| 3 | Name and grade | `climbing_routes.name`, `grades` enum |
+| 4 | Edit a saved route | `GET /api/routes/:id` + `PATCH /api/routes/:id` |
+| 5 | Delete a route | `DELETE /api/routes/:id` (holds cascade) |
+| 6 | Block saves without start/finish | `validateRoute()` + DB constraints |
+| 7 | Reset to starter routes | `POST /api/routes/reset` → `seedAllTables()` |
+| 8 | See all routes | `GET /api/routes` |
+| 9 | Filter by grade | Client-side filter on the full list |
+| 10 | Sort easiest → hardest | Client-side sort using the `grades` enum order from `/api/options` |
+| 11 | Open a route on its own page | `GET /api/routes/:id` |
+| 12 | Share a link | Client URL `/routes/:id` (backed by #11) |
+| 13 | Quick look | Uses data already loaded by `GET /api/routes` (no extra request) |
+
+## 7. Configuration
+
+| Variable | Where it's read | Purpose |
+|---|---|---|
+| `PGUSER`, `PGPASSWORD`, `PGHOST`, `PGPORT`, `PGDATABASE` | `server/config/database.js` | Postgres connection (copy `.env.example` → `.env` at the repo root) |
+| `PORT` | `server/server.js` | API port, defaults to `3000` |
+| `VITE_API_URL` | `client/src/api/routes.js` | API base URL in production. Leave it unset in dev so the Vite proxy is used |
+
+The pool always connects with `ssl: { rejectUnauthorized: false }` (set up for Render's hosted Postgres).
+
+---
+
+# Frontend
+
+## 8. Frontend stack and layout
+
+React 19 + Vite, React Router, and three.js (through `@react-three/fiber`, `drei` and `postprocessing`) for the 3D wall. There's no state library: shared data lives in `App.jsx` and in two React contexts. Plain CSS sits next to each component, and the design tokens live in `src/index.css`.
+
+```
+client/src/
+├── main.jsx                 Mounts <App/> in StrictMode, loads global CSS
+├── App.jsx                  Loads data, owns the route list, defines the pages, provides contexts
+├── api/                     The only code that calls fetch()
+│   ├── routes.js            request() helper + route CRUD + shape mappers (+ capitalize, normalizeRotation)
+│   ├── holds.js             GET /holds
+│   ├── options.js           GET /options
+│   └── wallTypes.js         GET /wall-types
+├── hooks/
+│   ├── useCatalog.js        CatalogContext: everything the backend allows (grades, roles, wall types, …)
+│   ├── useRoute.js          Fetch one route by id, with a loading/ready/missing/error status
+│   ├── useToast.js          ToastContext: toast(message, tone)
+│   ├── usePageTitle.js      Sets document.title
+│   └── usePointerGlow.js    Cursor spotlight effect (purely visual)
+├── pages/                   One component per URL
+│   ├── RouteGalleryPage     /                 hero + 3D showcase, filters, cards, quick look, reset
+│   ├── RouteBuilderPage     /routes/new       wraps RouteForm, plus "open a random route"
+│   ├── RouteDetailsPage     /routes/:id       2D/3D wall, share, delete
+│   ├── EditRoutePage        /routes/:id/edit  wraps RouteForm with an existing route
+│   └── NotFoundPage         *
+├── components/
+│   ├── RouteForm            The builder: wall editing, undo, hold editor, details, save checklist
+│   ├── WallComponent        2D bolt grid (read-only or editable), with footprint/overlap logic
+│   ├── Wall3DLazy           Lazy-loads Wall3DComponent (three.js is ~1.3 MB)
+│   ├── Wall3DComponent      3D gym scene: tilted board, photo-relief holds, camera, role highlights
+│   ├── ClimbingHoldsDrawer  Hold catalog picker (fetches /holds itself)
+│   ├── RotationDial         Rotation knob + number input
+│   ├── GradeFilter          Search + grade chips + wall-type chips + sort (the whole filter bar)
+│   ├── RouteGallery, RouteCard, QuickLookModal, GradeBadge, AngleGlyph, ViewToggle, Navbar
+│   ├── Hold.jsx             Exports HoldLegend (the role color key)
+│   └── ui/                  Dialog (native <dialog>), ConfirmDialog, ToastProvider
+├── utils/
+│   ├── display.js           Role colors, grade "tone" bands
+│   ├── holdFootprint.js     Hold size → drawn scale, footprint radius, covered/overlapping bolts
+│   └── hold3d.js            Procedural geometry, canvas textures, photo-relief builder for 3D holds
+└── styles/base.css, index.css
+```
+
+## 9. Component tree and who owns what state
+
+```
+App  (routes[], catalog, loading, error)
+├── CatalogContext.Provider  value = { grades, holdRoles, holdTypes, holdSizes, maxStartHolds, finishHolds, wallTypes }
+│   └── ToastProvider  (toast stack)
+│       ├── Navbar  (routeCount)
+│       └── <Routes>
+│           ├── RouteGalleryPage  props: routes, onReset          state: filters, previewRoute, confirmReset
+│           │   ├── Wall3DLazy (showcase of the route with the most holds)
+│           │   ├── GradeFilter → RouteGallery → RouteCard → WallComponent (sm)
+│           │   ├── QuickLookModal → Dialog → WallComponent
+│           │   └── ConfirmDialog (reset)
+│           ├── RouteBuilderPage  props: routes, onSave
+│           │   └── RouteForm (new)
+│           ├── RouteDetailsPage  props: onDelete                 useRoute(id); state: view, confirmDelete
+│           │   ├── WallComponent (lg) + HoldLegend   or   Wall3DLazy
+│           │   └── ConfirmDialog (delete)
+│           ├── EditRoutePage     props: onSave                   useRoute(id)
+│           │   └── RouteForm (existing)
+│           └── NotFoundPage
+```
+
+**RouteForm** owns all of the editing state: `name`, `grade`, `angle`, `holds[]`, an undo `history` (last 50 hold arrays), `selectedCell`, the picked catalog hold, `view` (2D/3D), `error` and `saving`. It derives the wall type from the angle using `catalog.wallTypes`, and it mirrors the server's save check using `maxStartHolds` and `finishHolds`.
+
+## 10. How the frontend gets its data
+
+| Data | Fetched by | When | Kept in | Read by |
+|---|---|---|---|---|
+| Route list | `App.fetchAll` → `api.getRoutes` | App start, and after every save/delete/reset (`refreshRoutes`) | `App` state | Gallery, Builder (random route), Navbar count |
+| Options (enums + limits) | `App.fetchAll` → `getOptions` | App start | `CatalogContext` | RouteForm, GradeFilter, GradeBadge, HoldLegend, Drawer, Wall3D, Gallery sort |
+| Wall types | `App.fetchAll` → `getWallTypes` | App start | `CatalogContext` | RouteForm (slider range and type), GradeFilter |
+| Hold catalog | `ClimbingHoldsDrawer` → `fetchHolds` | Every time a RouteForm mounts | Drawer local state | Drawer only |
+| One route | `useRoute(id)` → `getRoute` | Whenever the details or edit page opens | Hook state | Details page, Edit page |
+
+- The app shows a skeleton until all three startup requests finish. If **any** of them fails, every page is replaced by an error screen with a retry button.
+- Quick Look and the gallery cards reuse the list data, so they make no extra requests.
+- **Mutations** go through `App`: `saveRoute` (create or update), `deleteRoute` and `resetRoutes`. Each one calls the API and then **refetches the whole list**; nothing is patched locally. Errors are thrown back to the page, which shows them in the form or as a toast.
+
+## 11. Shape translation and display
+
+`api/routes.js` converts API routes into the shape components use (`angle`, `wallTypeId`, `wallType` capitalized, holds with `row`/`col`, rotation normalized to 0–359) and back again. `created_at` and `routeHoldId` are dropped. Components never see the API's field names.
+
+Display-only mappings live on the client:
+
+- **Role colors:** `utils/display.js` `ROLE_COLORS` (JS) and `.role-*` rules in `WallComponent.css` (CSS).
+- **Grade tones:** `gradeTone()` splits the backend's grade list into easy/moderate/hard/elite by position.
+- **Hold size → drawn scale:** `HOLD_SCALE` in `utils/holdFootprint.js` (small 0.8, medium 1.6, large 2.4 bolt cells).
+- **3D relief depth per hold type:** `RELIEF_DEPTH` in `Wall3DComponent.jsx`.
+
+## 12. The 2D wall and placement rules
+
+`WallComponent` draws a 16-row × 12-column CSS grid. Each cell is one of:
+
+1. a **placed hold**: a button when editable, otherwise an image,
+2. a **covered bolt**: hidden under a larger neighboring hold; clicking it selects that hold,
+3. a **blocked bolt**: an empty bolt where the hold being placed would overlap an existing one (editable mode only),
+4. an **empty bolt**.
+
+The covered/overlap rules use footprint circles from `holdFootprint.js`. **These rules exist only on the client.** The server only rejects two holds on the exact same bolt.
+
+## 13. Frontend view of each user story
+
+| # | Story | Where it happens |
+|---|---|---|
+| 1 | Click holds to build | `RouteForm.handleCellClick` → `WallComponent` (editable) + `ClimbingHoldsDrawer` |
+| 2 | Start/finish roles | Hold editor in `RouteForm` (role buttons from `catalog.holdRoles`, limited by `maxStartHolds`/`finishHolds`) |
+| 3 | Name and grade | `RouteForm` "Route details" panel (grades from `catalog.grades`) |
+| 4 | Edit | `EditRoutePage` → `useRoute` → `RouteForm existing` → `App.saveRoute` → PATCH |
+| 5 | Delete | `RouteDetailsPage` → `ConfirmDialog` → `App.deleteRoute` |
+| 6 | Save check | `RouteForm` checklist disables Save; server errors are shown in `form-error` |
+| 7 | Reset | `RouteGalleryPage` → `ConfirmDialog` → `App.resetRoutes` |
+| 8 | All routes | `RouteGalleryPage` → `RouteGallery` → `RouteCard` |
+| 9 | Filter by grade | `GradeFilter` chips → `filters.grade` in `RouteGalleryPage.visibleRoutes` |
+| 10 | Sort by difficulty | `filters.sort` sorts by index in `catalog.grades` |
+| 11 | Route page | `/routes/:id` → `RouteDetailsPage` |
+| 12 | Share link | `RouteDetailsPage.handleShare` (Web Share API on touch devices, otherwise copy to clipboard) |
+| 13 | Quick look | `RouteCard` eye button → `QuickLookModal` |
