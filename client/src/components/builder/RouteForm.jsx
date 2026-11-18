@@ -7,20 +7,21 @@ import RotationDial from './RotationDial'
 import ViewToggle from '../wall/ViewToggle'
 import Wall3DLazy from '../wall/Wall3DLazy'
 import { useCatalog } from '../../hooks/useCatalog'
-import { normalizeRotation } from '../../api/routes'
+import { normalizeRotation } from '../../utils/rotation'
+import { formatLabel } from '../../utils/format'
 import { gradeTone, roleColor } from '../../utils/display'
 import './RouteForm.css'
 
 const DEFAULT_ROLE = 'hand'
 const HISTORY_LIMIT = 50
 const isTyping = (target) => ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable
-const sameSpot = (a, b) => a && b && a.row === b.row && a.col === b.col
+const sameSpot = (a, b) => a && b && a.gridRow === b.gridRow && a.gridCol === b.gridCol
 
 function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
   const { grades, holdRoles, wallTypes, maxStartHolds, finishHolds } = useCatalog()
   const [name, setName] = useState(existing?.name ?? '')
   const [grade, setGrade] = useState(existing?.grade ?? grades[0])
-  const [angle, setAngle] = useState(existing?.angle ?? 0)
+  const [angleDegrees, setAngleDegrees] = useState(existing?.angleDegrees ?? 0)
   const [catalogHold, setCatalogHold] = useState(null)
   const [holds, setHolds] = useState(existing?.holds ?? [])
   const [history, setHistory] = useState([])
@@ -36,7 +37,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
   // One slider covers every wall type; the type follows from the angle
   const minAngle = Math.min(...wallTypes.map((type) => type.minAngle))
   const maxAngle = Math.max(...wallTypes.map((type) => type.maxAngle))
-  const wallType = wallTypes.find((type) => angle >= type.minAngle && angle <= type.maxAngle)
+  const wallType = wallTypes.find((type) => angleDegrees >= type.minAngle && angleDegrees <= type.maxAngle)
   const starts = holds.filter((hold) => hold.role === 'start').length
   const finishes = holds.filter((hold) => hold.role === 'finish').length
 
@@ -87,8 +88,8 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     commitHolds([
       ...holds,
       {
-        row,
-        col,
+        gridRow: row,
+        gridCol: col,
         role: DEFAULT_ROLE,
         rotation: 0,
         holdId: catalogHold.id,
@@ -98,7 +99,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
         color: catalogHold.color,
       },
     ])
-    setSelectedCell({ row, col })
+    setSelectedCell({ gridRow: row, gridCol: col })
   }
 
   function updateSelectedHold(changes, options) {
@@ -155,7 +156,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
     setError('')
     setSaving(true)
     try {
-      await onSave({ id: existing?.id, name: name.trim(), grade, angle, holds })
+      await onSave({ id: existing?.id, name: name.trim(), grade, angleDegrees, holds })
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -241,18 +242,18 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
         </div>
 
         {view === '3D' ? (
-          <Wall3DLazy holds={holds} wallType={wallType?.name} angle={angle} />
+          <Wall3DLazy holds={holds} wallType={wallType?.name} angle={angleDegrees} />
         ) : (
           <div className="wall-stage">
             <WallComponent
               holds={holds}
               wallType={wallType?.name}
-              angle={angle}
+              angle={angleDegrees}
               placingSize={catalogHold?.size ?? 'medium'}
               selectedCell={selectedCell}
               editable
               onCellClick={handleCellClick}
-              onPlacedHoldClick={(hold) => setSelectedCell({ row: hold.row, col: hold.col })}
+              onPlacedHoldClick={(hold) => setSelectedCell({ gridRow: hold.gridRow, gridCol: hold.gridCol })}
             />
             <HoldLegend />
           </div>
@@ -282,9 +283,9 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
             <span className="field-row">
               <label htmlFor="wall-angle">Wall angle</label>
               <span className="wall-type-readout">
-                <AngleGlyph angle={angle} />
-                <strong>{wallType?.name ?? '—'}</strong>
-                <output htmlFor="wall-angle" className="angle-value">{angle}°</output>
+                <AngleGlyph angle={angleDegrees} />
+                <strong>{wallType ? formatLabel(wallType.name) : '—'}</strong>
+                <output htmlFor="wall-angle" className="angle-value">{angleDegrees}°</output>
               </span>
             </span>
             <input
@@ -293,9 +294,9 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
               type="range"
               min={minAngle}
               max={maxAngle}
-              value={angle}
-              onChange={(event) => setAngle(Number(event.target.value))}
-              aria-valuetext={`${angle} degrees, ${wallType?.name ?? 'unknown'} wall`}
+              value={angleDegrees}
+              onChange={(event) => setAngleDegrees(Number(event.target.value))}
+              aria-valuetext={`${angleDegrees} degrees, ${wallType ? formatLabel(wallType.name) : 'unknown'} wall`}
             />
             {/* Each wall type's share of the slider, from the wall types */}
             <div className="wall-type-scale" aria-hidden="true">
@@ -305,7 +306,7 @@ function RouteForm({ existing, onSave, submitLabel = 'Save route' }) {
                   className={type.id === wallType?.id ? 'current' : ''}
                   style={{ flexGrow: type.maxAngle - type.minAngle + 1 }}
                 >
-                  {type.name}
+                  {formatLabel(type.name)}
                 </span>
               ))}
             </div>

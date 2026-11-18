@@ -1,4 +1,4 @@
-// Footprint math for holds on the 12 x 16 bolt grid. Distances are in bolt cells.
+// Footprint math for holds on the bolt grid from the catalog. Distances are in bolt cells.
 
 // How big each size is drawn, as a multiple of one bolt cell. Medium is the baseline:
 // small is 50% of medium and large is 150% of medium.
@@ -19,7 +19,7 @@ export function getFootprintRadius(size) {
   return (HOLD_SCALE[size] * VISIBLE_FRACTION) / 2
 }
 
-// Map of "row-col" -> hold for every bolt hole hidden under a neighboring hold.
+// Map of "gridRow-gridCol" -> hold for every bolt hole hidden under a neighboring hold.
 // A bolt counts as covered when its center falls inside the hold's footprint,
 // e.g. a large hold covers the four bolts directly around it.
 export function getCoveredBolts(holds) {
@@ -27,11 +27,11 @@ export function getCoveredBolts(holds) {
   for (const hold of holds) {
     const radius = getFootprintRadius(getHoldSize(hold))
     const reach = Math.floor(radius)
-    for (let row = hold.row - reach; row <= hold.row + reach; row++) {
-      for (let col = hold.col - reach; col <= hold.col + reach; col++) {
-        const isOwnCell = row === hold.row && col === hold.col
+    for (let row = hold.gridRow - reach; row <= hold.gridRow + reach; row++) {
+      for (let col = hold.gridCol - reach; col <= hold.gridCol + reach; col++) {
+        const isOwnCell = row === hold.gridRow && col === hold.gridCol
         const key = `${row}-${col}`
-        if (!isOwnCell && !covered.has(key) && Math.hypot(row - hold.row, col - hold.col) <= radius) {
+        if (!isOwnCell && !covered.has(key) && Math.hypot(row - hold.gridRow, col - hold.gridCol) <= radius) {
           covered.set(key, hold)
         }
       }
@@ -45,6 +45,6 @@ export function getCoveredBolts(holds) {
 export function findOverlappingHold(row, col, size, holds) {
   const radius = getFootprintRadius(size)
   return holds.find(
-    (hold) => Math.hypot(row - hold.row, col - hold.col) < radius + getFootprintRadius(getHoldSize(hold)),
+    (hold) => Math.hypot(row - hold.gridRow, col - hold.gridCol) < radius + getFootprintRadius(getHoldSize(hold)),
   )
 }

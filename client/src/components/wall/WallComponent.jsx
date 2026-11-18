@@ -1,6 +1,7 @@
-// Reusable 2D climbing wall: a 12 x 16 grid of T-nut bolt holes.
-// Row 0 is the top of the wall, row 15 is the floor.
+// Reusable 2D climbing wall: a grid of T-nut bolt holes (dimensions from the catalog).
+// Row 0 is the top of the wall.
 import { findOverlappingHold, getCoveredBolts, getHoldSize, HOLD_SCALE } from '../../utils/holdFootprint'
+import { formatLabel } from '../../utils/format'
 import './WallComponent.css'
 
 const ROWS = 16
@@ -15,7 +16,7 @@ function WallProfile({ wallType, angle }) {
   const length = 26
   const topX = baseX + length * Math.sin(radians)
   const topY = baseY - length * Math.cos(radians)
-  const name = wallType.charAt(0).toUpperCase() + wallType.slice(1).toLowerCase()
+  const name = formatLabel(wallType)
 
   return (
     <div className="wall-profile" aria-label={`${name} wall, ${angle} degrees`} role="img">
@@ -42,7 +43,7 @@ function WallComponent({
   onCellClick,
   onPlacedHoldClick,
 }) {
-  const holdsByCell = new Map(holds.map((hold) => [`${hold.row}-${hold.col}`, hold]))
+  const holdsByCell = new Map(holds.map((hold) => [`${hold.gridRow}-${hold.gridCol}`, hold]))
   const coveredBolts = editable ? getCoveredBolts(holds) : new Map()
 
   return (
@@ -69,7 +70,7 @@ function WallComponent({
             />
           )
           const label = `${holdSize} ${hold.role} hold at row ${row}, column ${col}`
-          const isSelected = selectedCell?.row === row && selectedCell?.col === col
+          const isSelected = selectedCell?.gridRow === row && selectedCell?.gridCol === col
 
           // The round hit area matches the hold's visible shape, so clicking anywhere on the
           // hold selects it (not the transparent corners of the PNG).
@@ -101,7 +102,7 @@ function WallComponent({
               className="wall-cell wall-cell-covered"
               key={key}
               type="button"
-              aria-label={`Bolt hole at row ${row}, column ${col}, covered by the ${coveringHold.role} hold at row ${coveringHold.row}, column ${coveringHold.col}`}
+              aria-label={`Bolt hole at row ${row}, column ${col}, covered by the ${coveringHold.role} hold at row ${coveringHold.gridRow}, column ${coveringHold.gridCol}`}
               onClick={() => onPlacedHoldClick?.(coveringHold)}
             />
           )
@@ -116,7 +117,7 @@ function WallComponent({
               key={key}
               type="button"
               disabled
-              aria-label={`Bolt hole at row ${row}, column ${col}, too close to the ${blockingHold.role} hold at row ${blockingHold.row}, column ${blockingHold.col}`}
+              aria-label={`Bolt hole at row ${row}, column ${col}, too close to the ${blockingHold.role} hold at row ${blockingHold.gridRow}, column ${blockingHold.gridCol}`}
             >
               <span className="wall-bolt" />
             </button>

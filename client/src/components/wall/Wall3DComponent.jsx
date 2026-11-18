@@ -227,7 +227,7 @@ function Hold3D({ hold, order, hovered, dimmed, onHover }) {
   const fade = { transparent: dimmed, opacity: dimmed ? 0.18 : 1, depthWrite: !dimmed }
 
   return (
-    <group position={[toWallX(hold.col), toWallY(hold.row), 0]}>
+    <group position={[toWallX(hold.gridCol), toWallY(hold.gridRow), 0]}>
       <group ref={pop} scale={0.0001}>
         {relief ? (
           <mesh
@@ -303,7 +303,7 @@ function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, backgroun
 
   // Bottom holds appear first, like a climber reading the route from the ground
   const order = useMemo(() => {
-    const sorted = [...holds].sort((a, b) => b.row - a.row || a.col - b.col)
+    const sorted = [...holds].sort((a, b) => b.gridRow - a.gridRow || a.gridCol - b.gridCol)
     return new Map(sorted.map((hold, index) => [hold, index]))
   }, [holds])
 
@@ -376,7 +376,7 @@ function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, backgroun
         <group position={[0, WALL_HEIGHT / 2, 0]}>
           <WallBoard />
           {holds.map((hold) => {
-            const key = `${hold.row}-${hold.col}`
+            const key = `${hold.gridRow}-${hold.gridCol}`
             return (
               <Hold3D
                 key={key}
@@ -384,7 +384,7 @@ function Scene({ holds, tilt, view, focusRole, autoRotate, onInteract, backgroun
                 order={order.get(hold)}
                 hovered={hovered === key}
                 dimmed={Boolean(focusRole) && roleOf(hold).id !== focusRole}
-                onHover={(target) => setHovered(target ? `${target.row}-${target.col}` : null)}
+                onHover={(target) => setHovered(target ? `${target.gridRow}-${target.gridCol}` : null)}
               />
             )
           })}

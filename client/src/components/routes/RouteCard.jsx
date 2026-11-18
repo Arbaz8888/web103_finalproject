@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import WallComponent from '../wall/WallComponent'
 import GradeBadge from './GradeBadge'
 import AngleGlyph from '../wall/AngleGlyph'
+import { formatLabel } from '../../utils/format'
 import './RouteCard.css'
 
 // The whole card links to the route page; the eye button opens a quick look instead.
@@ -39,7 +40,7 @@ function RouteCard({ route, onQuickLook, style }) {
           <GradeBadge grade={route.grade} />
         </div>
         <div className="route-card-meta">
-          <span><AngleGlyph angle={route.angle} /> {route.wallType} · {route.angle}°</span>
+          <span><AngleGlyph angle={route.angleDegrees} /> {formatLabel(route.wallType)} · {route.angleDegrees}°</span>
           <span>{route.holds.length} holds</span>
         </div>
       </div>

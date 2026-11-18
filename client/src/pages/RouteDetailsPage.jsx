@@ -7,6 +7,7 @@ import AngleGlyph from '../components/wall/AngleGlyph'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import ViewToggle from '../components/wall/ViewToggle'
 import Wall3DLazy from '../components/wall/Wall3DLazy'
+import { formatLabel } from '../utils/format'
 import NotFoundPage from './NotFoundPage'
 import { useRoute } from '../hooks/useRoute'
 import { useToast } from '../hooks/useToast'
@@ -71,7 +72,7 @@ function RouteDetailsPage({ onDelete }) {
           <div className="details-title">
             <GradeBadge grade={route.grade} size="xl" />
             <div>
-              <p className="eyebrow">{route.wallType.toUpperCase()} WALL · {route.angle}°</p>
+              <p className="eyebrow">{route.wallType.toUpperCase()} WALL · {route.angleDegrees}°</p>
               <h1>{route.name}</h1>
             </div>
           </div>
@@ -79,9 +80,9 @@ function RouteDetailsPage({ onDelete }) {
           <dl className="stat-grid">
             <div>
               <dt>Wall</dt>
-              <dd><AngleGlyph angle={route.angle} className="angle-glyph-lg" />{route.wallType}</dd>
+              <dd><AngleGlyph angle={route.angleDegrees} className="angle-glyph-lg" />{formatLabel(route.wallType)}</dd>
             </div>
-            <div><dt>Angle</dt><dd>{route.angle}°</dd></div>
+            <div><dt>Angle</dt><dd>{route.angleDegrees}°</dd></div>
             <div><dt>Holds</dt><dd>{route.holds.length}</dd></div>
           </dl>
 
@@ -95,10 +96,10 @@ function RouteDetailsPage({ onDelete }) {
         <div className="wall-view">
           <ViewToggle view={view} onChange={setView} />
           {view === '3D' ? (
-            <Wall3DLazy key={route.id} holds={route.holds} wallType={route.wallType} angle={route.angle} />
+            <Wall3DLazy key={route.id} holds={route.holds} wallType={route.wallType} angle={route.angleDegrees} />
           ) : (
             <div className="wall-stage">
-              <WallComponent holds={route.holds} size="lg" wallType={route.wallType} angle={route.angle} />
+              <WallComponent holds={route.holds} size="lg" wallType={route.wallType} angle={route.angleDegrees} />
               <HoldLegend />
             </div>
           )}

@@ -1,4 +1,5 @@
 import { useCatalog } from '../../hooks/useCatalog'
+import { formatLabel } from '../../utils/format'
 import './RouteFilters.css'
 
 const SORTS = [
@@ -66,7 +67,7 @@ function RouteFilters({ routes, filters, onChange, onClear }) {
             disabled={wallCounts[item] === 0 && wallType !== item}
             onClick={() => onChange({ wallType: wallType === item ? '' : item })}
           >
-            {item}
+            {formatLabel(item)}
             {wallCounts[item] > 0 && <span className="chip-count">{wallCounts[item]}</span>}
           </button>
         ))}

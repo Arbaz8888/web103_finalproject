@@ -82,7 +82,7 @@ function RouteGalleryPage({ routes, status, error, onRetry, onReset }) {
         <div className="hero-stage">
           {featured ? (
             <>
-              <Wall3DLazy key={featured.id} holds={featured.holds} angle={featured.angle} wallType={featured.wallType} showcase fallbackClassName="wall-3d-showcase" />
+              <Wall3DLazy key={featured.id} holds={featured.holds} angle={featured.angleDegrees} wallType={featured.wallType} showcase fallbackClassName="wall-3d-showcase" />
               <Link className="featured-chip" to={`/routes/${featured.id}`}>
                 <span className="featured-label">Featured route</span>
                 <strong>{featured.name}</strong>
